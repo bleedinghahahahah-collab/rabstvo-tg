@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Подполье</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="chain-backdrop">
+  <div class="chain-layer chain-layer-a"></div>
+  <div class="chain-layer chain-layer-b"></div>
+</div>
+
+<div id="app">
+
+  <!-- ===== Ledger header: always visible, shows the player's own standing ===== -->
+  <header class="ledger-card">
+    <div class="ledger-seal" id="seal">?</div>
+    <div class="ledger-main">
+      <div class="ledger-name" id="hdr-name">—</div>
+      <div class="ledger-title" id="hdr-rank">Бродяга</div>
+    </div>
+    <div class="ledger-balance">
+      <span class="balance-figure" id="hdr-balance">0</span>
+      <span class="balance-unit">монет</span>
+    </div>
+  </header>
+
+  <div class="ledger-substats">
+    <div class="substat">
+      <span class="substat-label">Доход</span>
+      <span class="substat-value" id="hdr-income">0/ч</span>
+    </div>
+    <div class="substat">
+      <span class="substat-label">Защита</span>
+      <span class="substat-value" id="hdr-protection">Ур. 1</span>
+    </div>
+    <div class="substat" id="hdr-status-wrap">
+      <span class="substat-label">Статус</span>
+      <span class="substat-value" id="hdr-status">Свободен</span>
+    </div>
+  </div>
+
+  <!-- ===== Tab panels ===== -->
+  <main id="panels">
+
+    <section class="panel active" data-panel="profile">
+      <div class="section-title">
+        <span class="eyebrow">Твоё дело</span>
+        <h2>Профиль</h2>
+      </div>
+
+      <button class="action-btn primary" id="btn-daily">
+        <span>🕯 Забрать дневной взнос</span>
+        <span class="btn-sub" id="daily-sub">доступно</span>
+      </button>
+
+      <button class="action-btn" id="btn-protect">
+        <span>🛡 Укрепить защиту</span>
+        <span class="btn-sub" id="protect-cost">—</span>
+      </button>
+
+      <button class="action-btn" id="btn-ransom">
+        <span>🔓 Выкупить свою свободу</span>
+        <span class="btn-sub" id="ransom-cost">—</span>
+      </button>
+
+      <div class="hint-box" id="ransom-hint" style="display:none">
+        Ты сейчас у кого-то в услужении. Пока не выкупишься — часть дохода уходит владельцу.
+      </div>
+    </section>
+
+    <section class="panel" data-panel="market">
+      <div class="section-title">
+        <span class="eyebrow">Свободные люди</span>
+        <h2>Рынок</h2>
+      </div>
+      <div class="list" id="market-list"><div class="empty-state">Ищем кандидатов…</div></div>
+    </section>
+
+    <section class="panel" data-panel="people">
+      <div class="section-title">
+        <span class="eyebrow">Твои активы</span>
+        <h2>Мои люди</h2>
+      </div>
+      <div class="list" id="people-list"><div class="empty-state">Пока никого нет.</div></div>
+    </section>
+
+    <section class="panel" data-panel="top">
+      <div class="section-title">
+        <span class="eyebrow">Иерархия подполья</span>
+        <h2>Топ игроков</h2>
+      </div>
+      <div class="list" id="top-list"><div class="empty-state">Считаем состояния…</div></div>
+    </section>
+
+    <section class="panel" data-panel="invite">
+      <div class="section-title">
+        <span class="eyebrow">Расширяй сеть</span>
+        <h2>Пригласить</h2>
+      </div>
+      <p class="invite-copy">
+        Каждый, кто зайдёт по твоей ссылке, сразу поступает к тебе в услужение — и приносит тебе бонус за вступление.
+      </p>
+      <button class="action-btn primary" id="btn-copy-link">
+        <span>🔗 Скопировать ссылку-приглашение</span>
+        <span class="btn-sub">поделиться</span>
+      </button>
+      <div class="hint-box" id="invite-link-box" style="display:none"></div>
+    </section>
+
+  </main>
+
+  <!-- ===== Bottom tab bar ===== -->
+  <nav class="tabbar">
+    <button class="tab-btn active" data-tab="profile"><span class="tab-icon">🕯</span><span>Профиль</span></button>
+    <button class="tab-btn" data-tab="market"><span class="tab-icon">⚖️</span><span>Рынок</span></button>
+    <button class="tab-btn" data-tab="people"><span class="tab-icon">🔗</span><span>Люди</span></button>
+    <button class="tab-btn" data-tab="top"><span class="tab-icon">👑</span><span>Топ</span></button>
+    <button class="tab-btn" data-tab="invite"><span class="tab-icon">✉️</span><span>Позвать</span></button>
+  </nav>
+
+  <div id="toast"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
