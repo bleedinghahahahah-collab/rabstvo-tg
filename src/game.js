@@ -51,6 +51,14 @@ function rankFor(count) {
   return title;
 }
 
+// ---- How far a player is from their next title, for a profile progress bar ----
+function nextRankInfo(count) {
+  for (const r of RANKS) {
+    if (count < r.min) return { title: r.title, remaining: r.min - count, needed: r.min };
+  }
+  return null; // already at the top rank
+}
+
 function ownedCount(userId) {
   return ownedBy(userId).length;
 }
@@ -236,6 +244,7 @@ module.exports = {
   randomJob,
   jobByKey,
   rankFor,
+  nextRankInfo,
   ownedCount,
   accrue,
   personPendingIncome,

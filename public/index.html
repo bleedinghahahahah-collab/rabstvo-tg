@@ -11,6 +11,30 @@
 </head>
 <body>
 
+<div id="splash">
+  <div class="splash-particles" id="splash-particles"></div>
+  <div class="splash-inner">
+    <svg class="splash-chain" viewBox="0 0 220 90" xmlns="http://www.w3.org/2000/svg">
+      <g class="splash-link splash-link-1">
+        <rect x="4" y="25" width="46" height="34" rx="17" fill="none" stroke="#c9c9c9" stroke-width="8"/>
+      </g>
+      <g class="splash-link splash-link-2">
+        <rect x="42" y="8" width="34" height="70" rx="17" fill="none" stroke="#e4e4e4" stroke-width="8" transform="rotate(90 59 43)"/>
+      </g>
+      <g class="splash-link splash-link-3">
+        <rect x="90" y="25" width="46" height="34" rx="17" fill="none" stroke="#c9c9c9" stroke-width="8"/>
+      </g>
+      <g class="splash-link splash-link-4">
+        <rect x="128" y="8" width="34" height="70" rx="17" fill="none" stroke="#e4e4e4" stroke-width="8" transform="rotate(90 145 43)"/>
+      </g>
+      <g class="splash-link splash-link-5">
+        <rect x="168" y="25" width="46" height="34" rx="17" fill="none" stroke="#c9c9c9" stroke-width="8"/>
+      </g>
+    </svg>
+    <div class="splash-title">ПОДПОЛЬЕ</div>
+  </div>
+</div>
+
 <div class="chain-backdrop">
   <div class="chain-layer"></div>
 </div>
@@ -54,18 +78,32 @@
         <h2>Профиль</h2>
       </div>
 
-      <button class="action-btn primary" id="btn-daily">
+      <div class="rank-progress-card">
+        <div class="rank-progress-top">
+          <span class="rank-progress-current" id="rank-progress-current">Прохожий</span>
+          <span class="rank-progress-next" id="rank-progress-next"></span>
+        </div>
+        <div class="rank-progress-bar"><div class="rank-progress-fill" id="rank-progress-fill"></div></div>
+      </div>
+
+      <div class="streak-card">
+        <div class="streak-label">Серия дней подряд</div>
+        <div class="streak-dots" id="streak-dots"></div>
+      </div>
+
+      <button class="action-btn glow-btn" id="btn-daily">
         <span>Забрать дневной взнос</span>
         <span class="btn-sub" id="daily-sub">доступно</span>
       </button>
 
-      <button class="action-btn" id="btn-ransom">
-        <span>Выкупить свою свободу</span>
-        <span class="btn-sub" id="ransom-cost">—</span>
-      </button>
-
-      <div class="hint-box" id="ransom-hint" style="display:none">
-        Ты сейчас у кого-то в услужении. Пока не выкупишься — часть дохода уходит владельцу.
+      <div id="ransom-section" style="display:none">
+        <div class="hint-box" id="ransom-hint">
+          Ты сейчас у кого-то в услужении. Пока не выкупишься — часть дохода уходит владельцу.
+        </div>
+        <button class="action-btn glow-btn red" id="btn-ransom">
+          <span>Выкупить свою свободу</span>
+          <span class="btn-sub" id="ransom-cost">—</span>
+        </button>
       </div>
     </section>
 
@@ -121,10 +159,27 @@
         <span class="eyebrow">Расширяй сеть</span>
         <h2>Пригласить</h2>
       </div>
-      <p class="invite-copy">
-        Каждый, кто зайдёт по твоей ссылке, сразу поступает к тебе в услужение — и приносит тебе бонус за вступление.
-      </p>
-      <button class="action-btn primary" id="btn-copy-link">
+
+      <div class="invite-hero">
+        <div class="invite-hero-icon">+</div>
+        <div>
+          <div class="invite-hero-title">Приведи друга — получи актив</div>
+          <div class="invite-hero-sub">Он сразу поступает к тебе в услужение</div>
+        </div>
+      </div>
+
+      <div class="invite-rewards">
+        <div class="invite-reward-card">
+          <span class="invite-reward-figure">+50</span>
+          <span class="invite-reward-label">тебе за приглашение</span>
+        </div>
+        <div class="invite-reward-card">
+          <span class="invite-reward-figure">+150</span>
+          <span class="invite-reward-label">другу на старте</span>
+        </div>
+      </div>
+
+      <button class="action-btn glow-btn green" id="btn-copy-link">
         <span>Скопировать ссылку-приглашение</span>
         <span class="btn-sub">поделиться</span>
       </button>

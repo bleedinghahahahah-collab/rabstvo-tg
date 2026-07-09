@@ -4,6 +4,30 @@ tg?.expand();
 
 const initData = tg?.initData || '';
 
+// ===== Splash screen: chain-link build-up + spark burst + fade-out =====
+(function runSplash() {
+  const splash = document.getElementById('splash');
+  const particlesWrap = document.getElementById('splash-particles');
+  if (!splash || !particlesWrap) return;
+
+  const SPARK_COUNT = 16;
+  for (let i = 0; i < SPARK_COUNT; i++) {
+    const spark = document.createElement('div');
+    spark.className = 'splash-spark';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 50 + Math.random() * 90;
+    spark.style.setProperty('--sx', `${Math.cos(angle) * dist}px`);
+    spark.style.setProperty('--sy', `${Math.sin(angle) * dist}px`);
+    spark.style.animationDelay = `${Math.random() * 0.9}s`;
+    particlesWrap.appendChild(spark);
+  }
+
+  setTimeout(() => {
+    splash.classList.add('fade-out');
+    setTimeout(() => splash.remove(), 650);
+  }, 1900);
+})();
+
 async function api(path, options = {}) {
   const res = await fetch(path, {
     ...options,
@@ -155,10 +179,38 @@ async function loadMe() {
   avatarImg.src = ownPhoto || `/api/avatar/${me.id}`;
   avatarImg.onerror = () => { avatarImg.style.display = 'none'; };
 
-  document.getElementById('ransom-hint').style.display = me.is_owned_by ? 'block' : 'none';
-  document.getElementById('ransom-cost').textContent = me.is_owned_by ? fmtDec(me.ransom_cost) : '—';
-  document.getElementById('btn-ransom').style.opacity = me.is_owned_by ? '1' : '.45';
-  document.getElementById('btn-ransom').disabled = !me.is_owned_by;
+  // Rank progress bar
+  document.getElementById('rank-progress-current').textContent = me.rank_title;
+  if (me.next_rank) {
+    document.getElementById('rank-progress-next').textContent = `до «${me.next_rank.title}»: ${me.next_rank.remaining}`;
+    const pct = Math.min(100, Math.max(4, (me.owned_count / me.next_rank.needed) * 100));
+    document.getElementById('rank-progress-fill').style.width = pct + '%';
+  } else {
+    document.getElementById('rank-progress-next').textContent = 'максимальное звание';
+    document.getElementById('rank-progress-fill').style.width = '100%';
+  }
+
+  // Streak dots (10 total, filled up to current streak)
+  const dotsWrap = document.getElementById('streak-dots');
+  dotsWrap.innerHTML = '';
+  for (let i = 1; i <= 10; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'streak-dot' + (i <= me.daily_streak ? ' filled' : '');
+    dotsWrap.appendChild(dot);
+  }
+
+  // Daily bonus button: green shimmer when available, pale/disabled once collected
+  const dailyBtn = document.getElementById('btn-daily');
+  dailyBtn.classList.toggle('available', me.daily_available);
+  dailyBtn.classList.toggle('collected', !me.daily_available);
+  dailyBtn.disabled = !me.daily_available;
+  document.getElementById('daily-sub').textContent = me.daily_available ? 'доступно' : 'уже забрано';
+
+  // Ransom section: only exists on screen at all while actually enslaved
+  document.getElementById('ransom-section').style.display = me.is_owned_by ? 'block' : 'none';
+  if (me.is_owned_by) {
+    document.getElementById('ransom-cost').textContent = fmtDec(me.ransom_cost);
+  }
 
   // Detect the free -> owned transition and show a big in-app alert.
   // (previousOwnerStatus stays `undefined` on the very first load so we
@@ -275,7 +327,7 @@ async function loadPeople() {
       </div>
       <div class="row-value">+${fmtDec(p.pending_income)}</div>
       <div class="row-actions">
-        <button class="mini-btn" data-action="collect" data-id="${p.id}">Забрать доход</button>
+        <button class="mini-btn collect" data-action="collect" data-id="${p.id}">Забрать доход</button>
         <button class="mini-btn danger" data-action="free" data-id="${p.id}">Отпустить</button>
       </div>
     `;
@@ -283,6 +335,7 @@ async function loadPeople() {
       ev.target.disabled = true;
       try {
         const r = await api(`/api/collect/${p.id}`, { method: 'POST' });
+        ev.target.classList.add('just-collected');
         toast(`Собрано: +${fmtDec(r.gained)}`);
         loadPeople();
         loadMe();
@@ -389,7 +442,7 @@ function updateFarmLockCountdown(unlockAt) {
 function spawnFarmParticle(btn) {
   const particle = document.createElement('div');
   particle.className = 'farm-particle';
-  particle.textContent = '+0.2';
+  particle.textContent = '+0.5';
   const angle = Math.random() * Math.PI * 2;
   const distance = 60 + Math.random() * 40;
   particle.style.setProperty('--fx', `${Math.cos(angle) * distance}px`);

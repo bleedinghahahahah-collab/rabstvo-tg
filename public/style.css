@@ -6,6 +6,10 @@
   --gray-bright: #E4E4E4;
   --gray-line: #333333;
   --gray-muted: #7a7a7a;
+  --green: #3ECF8E;
+  --green-pale: #46614F;
+  --red: #E5484D;
+  --red-pale: #6B3A3C;
   --font-body: 'Open Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -64,7 +68,98 @@ html, body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding-bottom: 108px;
+  padding-bottom: 118px;
+}
+
+/* ===================================================================
+   Splash screen — chain-link logo assembles out of darkness with a
+   spark burst, the title glitches into place, then the whole thing
+   fades out to reveal the app underneath.
+   =================================================================== */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+#splash.fade-out {
+  animation: splashFadeOut .6s ease forwards;
+  pointer-events: none;
+}
+@keyframes splashFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.splash-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.splash-chain {
+  width: 210px;
+  height: auto;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.15));
+}
+
+.splash-link {
+  opacity: 0;
+  transform-origin: center;
+  animation: splashLinkIn .55s cubic-bezier(.34,1.56,.64,1) both;
+}
+.splash-link-1 { animation-delay: .05s; }
+.splash-link-2 { animation-delay: .18s; }
+.splash-link-3 { animation-delay: .31s; }
+.splash-link-4 { animation-delay: .44s; }
+.splash-link-5 { animation-delay: .57s; }
+
+@keyframes splashLinkIn {
+  0%   { opacity: 0; transform: translateY(-50px) rotate(-50deg) scale(0.4); }
+  65%  { opacity: 1; transform: translateY(3px) rotate(6deg) scale(1.06); }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+}
+
+.splash-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  color: var(--gray-bright);
+  opacity: 0;
+  animation: splashGlitch .7s steps(1) .85s forwards;
+}
+@keyframes splashGlitch {
+  0%   { opacity: 0; transform: translateX(0); text-shadow: none; }
+  8%   { opacity: 1; transform: translateX(-4px); text-shadow: 3px 0 rgba(255,255,255,0.4), -3px 0 rgba(255,255,255,0.2); }
+  16%  { transform: translateX(3px); }
+  24%  { transform: translateX(-2px); opacity: 0.4; }
+  32%  { opacity: 1; transform: translateX(2px); text-shadow: -2px 0 rgba(255,255,255,0.3), 2px 0 rgba(255,255,255,0.15); }
+  40%  { transform: translateX(0); text-shadow: none; }
+  100% { opacity: 1; transform: translateX(0); text-shadow: none; }
+}
+
+.splash-particles { position: absolute; inset: 0; pointer-events: none; }
+.splash-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--gray-bright);
+  opacity: 0;
+  animation: splashSparkFly .7s ease-out forwards;
+}
+@keyframes splashSparkFly {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  35%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(1.2); }
 }
 
 /* ===== Ledger header ===== */
@@ -383,7 +478,11 @@ main#panels {
   transition: transform .12s cubic-bezier(.4,0,.2,1), box-shadow .12s cubic-bezier(.4,0,.2,1), background .15s ease;
 }
 .mini-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #050505, 0 1px 2px rgba(0,0,0,0.3); background: #101010; }
-.mini-btn.danger { border-color: var(--gray-muted); color: var(--paper); border-style: dashed; }
+.mini-btn.collect { border-color: var(--green); color: var(--green); }
+.mini-btn.collect:active { background: var(--green-pale); color: #cfe9db; }
+.mini-btn.collect.just-collected { background: var(--green-pale); color: #cfe9db; }
+.mini-btn.danger { border-color: var(--red); color: #f0a2a4; }
+.mini-btn.danger:active { background: var(--red-pale); }
 
 .action-btn {
   width: 100%;
@@ -414,15 +513,125 @@ main#panels {
   border-radius: 8px;
   padding: 12px;
   margin-top: 4px;
+  margin-bottom: 10px;
   word-break: break-all;
 }
 
 .invite-copy { font-size: 13.5px; color: var(--gray-muted); line-height: 1.5; margin-bottom: 16px; }
 
+/* ===== Profile: rank progress + streak cards ===== */
+.rank-progress-card {
+  background: var(--ink-raised);
+  border: 1px solid var(--gray-line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.rank-progress-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
+.rank-progress-current { font-weight: 700; font-size: 15px; color: var(--paper); }
+.rank-progress-next { font-size: 11.5px; color: var(--gray-muted); }
+.rank-progress-bar { height: 6px; border-radius: 3px; background: #232323; overflow: hidden; }
+.rank-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gray-accent), var(--gray-bright));
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+
+.streak-card {
+  background: var(--ink-raised);
+  border: 1px solid var(--gray-line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.streak-label { font-size: 11px; color: var(--gray-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+.streak-dots { display: flex; gap: 6px; }
+.streak-dot { width: 15px; height: 15px; border-radius: 50%; background: #232323; border: 1px solid var(--gray-line); }
+.streak-dot.filled { background: var(--green); border-color: var(--green); box-shadow: 0 0 7px rgba(62, 207, 142, 0.5); }
+
+/* ===== Glow buttons: green (positive, shimmering) / red (danger) / dim (used up) ===== */
+.glow-btn.green,
+#btn-daily.available {
+  border-color: var(--green);
+  background:
+    linear-gradient(135deg, transparent 40%, rgba(62, 207, 142, 0.35) 50%, transparent 60%),
+    linear-gradient(180deg, rgba(62, 207, 142, 0.16), rgba(62, 207, 142, 0.03));
+  background-size: 300% 300%, 100% 100%;
+  animation: glowShimmer 2.4s ease-in-out infinite;
+}
+.glow-btn.green .btn-sub,
+#btn-daily.available .btn-sub { color: #9beec4; }
+
+.glow-btn.red {
+  border-color: var(--red);
+  background: linear-gradient(180deg, rgba(229, 72, 77, 0.16), rgba(229, 72, 77, 0.03));
+}
+.glow-btn.red .btn-sub { color: #f0a2a4; }
+
+#btn-daily.collected {
+  opacity: 0.5;
+  border-color: var(--gray-line) !important;
+  background: #161616 !important;
+  animation: none !important;
+}
+
+@keyframes glowShimmer {
+  0%   { background-position: 0% 0%, 0 0; }
+  50%  { background-position: 100% 100%, 0 0; }
+  100% { background-position: 0% 0%, 0 0; }
+}
+
+/* ===== Invite tab hero + reward cards ===== */
+.invite-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--ink-raised);
+  border: 1px solid var(--gray-line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.invite-hero-icon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--green);
+}
+.invite-hero-title { font-weight: 700; font-size: 14.5px; color: var(--paper); }
+.invite-hero-sub { font-size: 12px; color: var(--gray-muted); margin-top: 2px; }
+
+.invite-rewards { display: flex; gap: 10px; margin-bottom: 18px; }
+.invite-reward-card {
+  flex: 1;
+  background: var(--ink-raised);
+  border: 1px solid var(--gray-line);
+  border-radius: 12px;
+  padding: 14px 10px;
+  text-align: center;
+}
+.invite-reward-figure {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--green);
+  margin-bottom: 4px;
+}
+.invite-reward-label { font-size: 10.5px; color: var(--gray-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
 /* ===== Bottom tab bar ===== */
 .tabbar {
   position: fixed;
-  bottom: calc(14px + env(safe-area-inset-bottom));
+  bottom: calc(22px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 24px);

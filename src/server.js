@@ -12,6 +12,7 @@ const {
   successChance,
   logEvent,
   refreshRank,
+  nextRankInfo,
   runRebellionTick,
   randomJob,
   jobByKey,
@@ -59,6 +60,8 @@ function requireAuth(req, res, next) {
 
 function publicUser(u) {
   const owned = ownedCount(u.id);
+  const now = Math.floor(Date.now() / 1000);
+  const hoursSinceDaily = (now - u.last_daily) / 3600;
   return {
     id: u.id,
     username: u.username,
@@ -70,6 +73,8 @@ function publicUser(u) {
     is_owned_by: u.owner_id,
     rank_title: u.rank_title,
     daily_streak: u.daily_streak,
+    daily_available: hoursSinceDaily >= 20,
+    next_rank: nextRankInfo(owned),
     ransom_cost: u.owner_id ? ransomCost(u) : null,
   };
 }
