@@ -351,15 +351,17 @@ app.post('/api/shop/invoice', requireAuth, async (req, res) => {
   if (!item) return res.status(404).json({ error: 'Такого товара нет' });
 
   try {
-    const link = await bot.api.createInvoiceLink({
-      title: item.title,
-      description: item.description,
-      payload: JSON.stringify({ userId: req.userId, item: req.body.item }),
-      currency: 'XTR',
-      prices: [{ label: item.title, amount: item.price }],
-    });
+    const link = await bot.api.createInvoiceLink(
+      item.title,
+      item.description,
+      JSON.stringify({ userId: req.userId, item: req.body.item }),
+      '', // provider_token — must be empty string for Telegram Stars
+      'XTR',
+      [{ label: item.title, amount: item.price }]
+    );
     res.json({ link });
   } catch (e) {
+    console.error('createInvoiceLink failed:', e);
     res.status(500).json({ error: 'Не удалось создать счёт' });
   }
 });
