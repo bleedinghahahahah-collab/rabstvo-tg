@@ -28,9 +28,9 @@ function createBot({ token, webAppUrl }) {
       const inviter = getUser(refBy);
       if (inviter) {
         const job = randomJob();
-        updateUser(refBy, { balance: inviter.balance + 150 });
+        updateUser(refBy, { balance: inviter.balance + 50 });
         updateUser(user.id, {
-          balance: user.balance + 100,
+          balance: user.balance + 150,
           owner_id: refBy,
           job: job.key,
           income_last_claim: Math.floor(Date.now() / 1000),

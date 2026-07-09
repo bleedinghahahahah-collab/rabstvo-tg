@@ -4,25 +4,25 @@ const { getUser, updateUser, ownedBy, allUsers, logEvent: dbLogEvent } = require
 // its own hourly income, balanced so the average stays close to the old
 // flat rate — variety without breaking the economy. ----
 const JOBS = [
-  { key: 'toilet', name: 'Мойщик параши', income: 15, blurb: 'Драит толчки с чувством, с толком, с расстановкой.' },
-  { key: 'taxi', name: 'Таксист', income: 21, blurb: 'Возит клиентов в объезд для повышения счётчика.' },
-  { key: 'trader', name: 'Трейдер', income: 24, blurb: 'Сливает депозит с уверенным видом.' },
-  { key: 'diver', name: 'Водолаз', income: 18, blurb: 'Ищет на дне реки то, что все давно потеряли.' },
-  { key: 'lookout', name: 'Смотрящий за подъездом', income: 15, blurb: 'Следит, чтобы лифт работал хотя бы иногда.' },
-  { key: 'noodle_dealer', name: 'Барыга доширака', income: 18, blurb: 'Продаёт лапшу втридорога прямо у окна камеры.' },
-  { key: 'fortune_teller', name: 'Гадалка на кофейной гуще', income: 15, blurb: 'Предсказывает конец срока с точностью до квартала.' },
-  { key: 'ad_copywriter', name: 'Копирайтер объявлений «куплю/продам»', income: 18, blurb: 'Пишет "торг уместен" с настоящей душой.' },
-  { key: 'funeral_dj', name: 'Диджей на похоронах', income: 21, blurb: 'Ставит грустные биты за скромный гонорар.' },
-  { key: 'scrap_dealer', name: 'Скупщик металлолома', income: 21, blurb: 'Утаскивает всё, что плохо прикручено.' },
-  { key: 'bootleg_seller', name: 'Продавец пиратских дисков', income: 18, blurb: '«Держи, брат, HD-качество» — качество не гарантирует.' },
-  { key: 'mystery_courier', name: 'Курьер сомнительных посылок', income: 24, blurb: 'Не задаёт вопросов, просто доставляет.' },
-  { key: 'background_actor', name: 'Актёр массовки в сериале', income: 15, blurb: 'Играет «прохожего номер три» уже седьмой сезон.' },
-  { key: 'shawarma_owner', name: 'Владелец ларька с шаурмой', income: 27, blurb: 'Единственный, у кого доход реально стабилен.' },
-  { key: 'pigeon_keeper', name: 'Смотритель голубей', income: 12, blurb: 'Кормит птиц и втайне мечтает о лучшей жизни.' },
-  { key: 'charger_tester', name: 'Тестировщик китайских зарядок', income: 15, blurb: 'Проверяет, взорвётся или нет. Пока везёт.' },
-  { key: 'cellmate_therapist', name: 'Психолог для сокамерников', income: 18, blurb: 'Слушает всех, советует всем, платят единицы.' },
-  { key: 'crypto_evangelist', name: 'Крипто-евангелист', income: 24, blurb: 'Обещает иксы, доставляет нули.' },
-  { key: 'cat_shepherd', name: 'Пастух дворовых котов', income: 12, blurb: 'Особая порода терпения.' },
+  { key: 'toilet', name: 'Мойщик параши', income: 26, blurb: 'Драит толчки с чувством, с толком, с расстановкой.' },
+  { key: 'taxi', name: 'Таксист', income: 37, blurb: 'Возит клиентов в объезд для повышения счётчика.' },
+  { key: 'trader', name: 'Трейдер', income: 42, blurb: 'Сливает депозит с уверенным видом.' },
+  { key: 'diver', name: 'Водолаз', income: 32, blurb: 'Ищет на дне реки то, что все давно потеряли.' },
+  { key: 'lookout', name: 'Смотрящий за подъездом', income: 26, blurb: 'Следит, чтобы лифт работал хотя бы иногда.' },
+  { key: 'noodle_dealer', name: 'Барыга доширака', income: 32, blurb: 'Продаёт лапшу втридорога прямо у окна камеры.' },
+  { key: 'fortune_teller', name: 'Гадалка на кофейной гуще', income: 26, blurb: 'Предсказывает конец срока с точностью до квартала.' },
+  { key: 'ad_copywriter', name: 'Копирайтер объявлений «куплю/продам»', income: 32, blurb: 'Пишет "торг уместен" с настоящей душой.' },
+  { key: 'funeral_dj', name: 'Диджей на похоронах', income: 37, blurb: 'Ставит грустные биты за скромный гонорар.' },
+  { key: 'scrap_dealer', name: 'Скупщик металлолома', income: 37, blurb: 'Утаскивает всё, что плохо прикручено.' },
+  { key: 'bootleg_seller', name: 'Продавец пиратских дисков', income: 32, blurb: '«Держи, брат, HD-качество» — качество не гарантирует.' },
+  { key: 'mystery_courier', name: 'Курьер сомнительных посылок', income: 42, blurb: 'Не задаёт вопросов, просто доставляет.' },
+  { key: 'background_actor', name: 'Актёр массовки в сериале', income: 26, blurb: 'Играет «прохожего номер три» уже седьмой сезон.' },
+  { key: 'shawarma_owner', name: 'Владелец ларька с шаурмой', income: 47, blurb: 'Единственный, у кого доход реально стабилен.' },
+  { key: 'pigeon_keeper', name: 'Смотритель голубей', income: 21, blurb: 'Кормит птиц и втайне мечтает о лучшей жизни.' },
+  { key: 'charger_tester', name: 'Тестировщик китайских зарядок', income: 26, blurb: 'Проверяет, взорвётся или нет. Пока везёт.' },
+  { key: 'cellmate_therapist', name: 'Психолог для сокамерников', income: 32, blurb: 'Слушает всех, советует всем, платят единицы.' },
+  { key: 'crypto_evangelist', name: 'Крипто-евангелист', income: 42, blurb: 'Обещает иксы, доставляет нули.' },
+  { key: 'cat_shepherd', name: 'Пастух дворовых котов', income: 21, blurb: 'Особая порода терпения.' },
 ];
 
 function randomJob() {
@@ -104,15 +104,26 @@ function effectiveIncome(u) {
 // ---- Cost to acquire a target: scales with their protection + how many people they own ----
 function acquisitionCost(target) {
   const owned = ownedCount(target.id);
-  return Math.floor(80 * Math.pow(1.35, target.protection - 1) + owned * 40);
+  return Math.floor(140 * Math.pow(1.35, target.protection - 1) + owned * 70);
 }
 
-// ---- Chance attacker succeeds: power vs target protection ----
+// ---- Chance attacker succeeds: weighted so weak targets (few/no people of
+// their own) are noticeably easy to take, and well-built targets are
+// noticeably harder — with a higher overall baseline than before. ----
 function successChance(attacker, target) {
-  const atk = attacker.protection + ownedCount(attacker.id) * 0.5;
-  const def = target.protection + ownedCount(target.id) * 0.7;
-  const raw = atk / (atk + def);
-  return Math.min(0.85, Math.max(0.15, raw));
+  const atkPower = 10 + ownedCount(attacker.id) * 4 + attacker.protection * 2;
+  const defPower = 10 + ownedCount(target.id) * 6 + target.protection * 2;
+  const raw = atkPower / (atkPower + defPower);
+  return Math.min(0.92, Math.max(0.25, raw));
+}
+
+// ---- Price to buy your own freedom: reflects how valuable you are as an
+// asset (your job income + your own little empire), not just your balance ----
+function ransomCost(person) {
+  const job = jobByKey(person.job);
+  const jobIncome = job ? job.income : 6;
+  const owned = ownedCount(person.id);
+  return Math.floor(90 + jobIncome * 12 + owned * 35 + person.balance * 0.15);
 }
 
 // NOTE: protection upgrades were removed as a player-facing feature per
@@ -132,10 +143,10 @@ function refreshRank(userId) {
 // Farm: tap-to-earn. 0.2 coins per tap, max 4 taps/sec, 5000 taps then a
 // 3-hour cooldown before the counter resets.
 // ===================================================================
-const FARM_REWARD = 0.2;
+const FARM_REWARD = 0.5;
 const FARM_TAP_LIMIT = 5000;
 const FARM_COOLDOWN_MS = 3 * 60 * 60 * 1000;
-const FARM_MIN_INTERVAL_MS = 110; // ~9 taps/sec — fast enough for two-finger alternating taps
+const FARM_MIN_INTERVAL_MS = 60; // ~16 taps/sec — comfortably covers fast two-finger tapping
 
 function farmStatus(user) {
   const now = Date.now();
@@ -232,6 +243,7 @@ module.exports = {
   effectiveIncome,
   acquisitionCost,
   successChance,
+  ransomCost,
   logEvent,
   refreshRank,
   runRebellionTick,

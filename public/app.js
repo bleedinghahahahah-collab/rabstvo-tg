@@ -67,7 +67,7 @@ function fmtDec(n) {
 // Now panels are normal flow by default, and only become position:absolute
 // (via the .transitioning class) for the ~280ms the animation runs.
 const TAB_ORDER = ['profile', 'market', 'people', 'farm', 'top', 'invite'];
-const TRANSITION_MS = 280;
+const TRANSITION_MS = 300;
 let currentTab = 'profile';
 let tabTransitionTimer = null;
 
@@ -156,6 +156,7 @@ async function loadMe() {
   avatarImg.onerror = () => { avatarImg.style.display = 'none'; };
 
   document.getElementById('ransom-hint').style.display = me.is_owned_by ? 'block' : 'none';
+  document.getElementById('ransom-cost').textContent = me.is_owned_by ? fmtDec(me.ransom_cost) : '—';
   document.getElementById('btn-ransom').style.opacity = me.is_owned_by ? '1' : '.45';
   document.getElementById('btn-ransom').disabled = !me.is_owned_by;
 
@@ -332,7 +333,7 @@ async function loadTop() {
 }
 
 // ===== Farm tab =====
-const FARM_MIN_INTERVAL_MS = 110; // matches server-side limit
+const FARM_MIN_INTERVAL_MS = 60; // matches server-side limit
 let farmLastClientTap = 0;
 let farmLocked = false;
 let farmCountdownTimer = null;
@@ -413,6 +414,7 @@ function attemptFarmTap(btn) {
 
   spawnFarmParticle(btn);
   bumpCounter();
+  tg?.HapticFeedback?.impactOccurred?.('light');
 
   api('/api/farm/tap', { method: 'POST' })
     .then((r) => {

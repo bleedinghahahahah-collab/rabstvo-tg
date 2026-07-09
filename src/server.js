@@ -17,6 +17,7 @@ const {
   jobByKey,
   personPendingIncome,
   collectFromPerson,
+  ransomCost,
   farmStatus,
   tryFarmTap,
   runFarmCooldownTick,
@@ -69,6 +70,7 @@ function publicUser(u) {
     is_owned_by: u.owner_id,
     rank_title: u.rank_title,
     daily_streak: u.daily_streak,
+    ransom_cost: u.owner_id ? ransomCost(u) : null,
   };
 }
 
@@ -137,7 +139,7 @@ app.get('/api/my-people', requireAuth, (req, res) => {
         username: u.username,
         first_name: u.first_name,
         balance: u.balance,
-        ransom_cost: Math.max(50, Math.floor(u.balance * 0.4) + 50),
+        ransom_cost: ransomCost(u),
         job_name: job ? job.name : 'Без определённой профессии',
         job_blurb: job ? job.blurb : 'Пока просто числится.',
         job_income: job ? job.income : 6,
@@ -176,7 +178,7 @@ app.post('/api/free/:id', requireAuth, (req, res) => {
 app.post('/api/ransom', requireAuth, (req, res) => {
   const me = getUser(req.userId);
   if (!me.owner_id) return res.status(400).json({ error: 'Ты и так свободен' });
-  const cost = Math.max(50, Math.floor(me.balance * 0.4) + 50);
+  const cost = ransomCost(me);
   if (me.balance < cost) return res.status(400).json({ error: 'Недостаточно монет для выкупа', cost });
   const oldOwner = me.owner_id;
   updateUser(me.id, { balance: me.balance - cost, owner_id: null });
@@ -237,7 +239,7 @@ app.post('/api/daily', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Уже забрано сегодня', next_in_hours: Math.ceil(20 - hoursSince) });
   }
   const streak = hoursSince > 48 ? 1 : me.daily_streak + 1;
-  const bonus = 40 + Math.min(streak, 10) * 15;
+  const bonus = 70 + Math.min(streak, 10) * 25;
   updateUser(me.id, { balance: me.balance + bonus, last_daily: now, daily_streak: streak });
   res.json({ bonus, streak, balance: getUser(me.id).balance });
 });
