@@ -262,7 +262,27 @@ document.getElementById('btn-ransom').addEventListener('click', async () => {
 });
 
 // ===== Market tab =====
+// ===== Market tab: "Свободные" (free agents) / "Украсть" (steal from others) =====
+let marketMode = 'free';
+
+document.querySelectorAll('#market-segmented .segmented-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.mode === marketMode) return;
+    document.querySelectorAll('#market-segmented .segmented-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    marketMode = btn.dataset.mode;
+    document.getElementById('market-eyebrow').textContent =
+      marketMode === 'free' ? 'Свободные люди' : 'Люди с хозяином';
+    loadMarket();
+  });
+});
+
 async function loadMarket() {
+  if (marketMode === 'free') return loadFreeMarket();
+  return loadStealMarket();
+}
+
+async function loadFreeMarket() {
   const list = document.getElementById('market-list');
   list.innerHTML = '<div class="empty-state">Ищем кандидатов…</div>';
   const rows = await api('/api/market');
@@ -293,6 +313,50 @@ async function loadMarket() {
           body: JSON.stringify({ targetId: p.id }),
         });
         toast(r.success ? `Успех! Шанс был ${r.chance}%` : `Не вышло. Шанс был ${r.chance}%`);
+        loadMarket();
+        loadMe();
+      } catch (e) {
+        toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
+        ev.target.disabled = false;
+      }
+    });
+    list.appendChild(row);
+  });
+}
+
+async function loadStealMarket() {
+  const list = document.getElementById('market-list');
+  list.innerHTML = '<div class="empty-state">Ищем чужих людей…</div>';
+  const rows = await api('/api/market/stealable');
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty-state">Пока красть не у кого — у всех либо нет людей, либо это твои же.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  rows.forEach((p) => {
+    const name = p.username ? '@' + p.username : p.first_name || 'Без имени';
+    const row = document.createElement('div');
+    row.className = 'ledger-row';
+    row.style.flexWrap = 'wrap';
+    row.innerHTML = `
+      <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
+      <div style="min-width:0;flex:1;">
+        <div class="row-name">${name}</div>
+        <div class="row-meta">у ${p.owner_name}</div>
+      </div>
+      <div class="row-value">${fmt(p.cost)}</div>
+      <div class="row-actions">
+        <button class="mini-btn danger" data-id="${p.id}">Украсть</button>
+      </div>
+    `;
+    row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
+      ev.target.disabled = true;
+      try {
+        const r = await api('/api/steal', {
+          method: 'POST',
+          body: JSON.stringify({ targetId: p.id }),
+        });
+        toast(r.success ? `Украдено! Шанс был ${r.chance}%` : `Не вышло. Шанс был ${r.chance}%`);
         loadMarket();
         loadMe();
       } catch (e) {
@@ -442,7 +506,7 @@ function updateFarmLockCountdown(unlockAt) {
 function spawnFarmParticle(btn) {
   const particle = document.createElement('div');
   particle.className = 'farm-particle';
-  particle.textContent = '+0.5';
+  particle.textContent = '+1';
   const angle = Math.random() * Math.PI * 2;
   const distance = 60 + Math.random() * 40;
   particle.style.setProperty('--fx', `${Math.cos(angle) * distance}px`);

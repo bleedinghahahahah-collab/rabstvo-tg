@@ -43,9 +43,9 @@ function upsertUser({ id, username, first_name, ref_by }) {
       id,
       username: username || null,
       first_name: first_name || null,
-      balance: 250,
+      balance: 500,
       protection: 1,
-      income_per_hour: 35,
+      income_per_hour: 70,
       owner_id: null,
       last_claim: Math.floor(Date.now() / 1000),
       last_daily: 0,
@@ -89,6 +89,18 @@ function freeUsers(excludeId, limit = 15) {
   return candidates.slice(0, limit);
 }
 
+// ---- People already owned by SOMEONE ELSE — the pool for the "steal" feature ----
+function stealableUsers(excludeId, limit = 15) {
+  const candidates = allUsers().filter(
+    (u) => u.owner_id !== null && u.owner_id !== excludeId && u.id !== excludeId
+  );
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  return candidates.slice(0, limit);
+}
+
 function topByBalance(limit = 20) {
   return allUsers()
     .sort((a, b) => b.balance - a.balance)
@@ -113,6 +125,7 @@ module.exports = {
   allUsers,
   ownedBy,
   freeUsers,
+  stealableUsers,
   topByBalance,
   logEvent,
 };

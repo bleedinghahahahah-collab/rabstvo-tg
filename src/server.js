@@ -3,7 +3,7 @@ const path = require('path');
 const express = require('express');
 const { webhookCallback } = require('grammy');
 
-const { getUser, upsertUser, updateUser, ownedBy, freeUsers, topByBalance } = require('./db');
+const { getUser, upsertUser, updateUser, ownedBy, freeUsers, stealableUsers, topByBalance } = require('./db');
 const {
   accrue,
   effectiveIncome,
@@ -19,6 +19,8 @@ const {
   personPendingIncome,
   collectFromPerson,
   ransomCost,
+  stealCost,
+  stealChance,
   farmStatus,
   tryFarmTap,
   runFarmCooldownTick,
@@ -128,6 +130,58 @@ app.post('/api/acquire', requireAuth, (req, res) => {
   } else {
     logEvent(attacker.id, 'raid_failed', { target: target.id });
     notify(target.id, `Игрок ${displayName(attacker)} попытался тебя захватить — твоя защита выстояла.`);
+  }
+
+  res.json({ success, chance: Math.round(chance * 100), spent: cost, balance: getUser(attacker.id).balance });
+});
+
+// ---- GET /api/market/stealable: people already owned by SOMEONE ELSE ----
+app.get('/api/market/stealable', requireAuth, (req, res) => {
+  const rows = stealableUsers(req.userId, 15);
+  const list = rows.map((u) => {
+    const owner = getUser(u.owner_id);
+    return {
+      id: u.id,
+      username: u.username,
+      first_name: u.first_name,
+      owner_name: owner ? displayName(owner) : 'Неизвестно',
+      cost: stealCost(u),
+    };
+  });
+  res.json(list);
+});
+
+// ---- POST /api/steal { targetId } — take someone away from their current owner ----
+app.post('/api/steal', requireAuth, (req, res) => {
+  const { targetId } = req.body;
+  const attacker = getUser(req.userId);
+  const target = getUser(targetId);
+  if (!target) return res.status(404).json({ error: 'Игрок не найден' });
+  if (target.id === attacker.id) return res.status(400).json({ error: 'Себя не поработишь' });
+  if (!target.owner_id) return res.status(400).json({ error: 'Этот человек свободен — используй «Захватить» на вкладке «Свободные»' });
+  if (target.owner_id === attacker.id) return res.status(400).json({ error: 'Он уже твой' });
+
+  const cost = stealCost(target);
+  if (attacker.balance < cost) return res.status(400).json({ error: 'Недостаточно монет', cost });
+
+  const oldOwnerId = target.owner_id;
+  const oldOwner = getUser(oldOwnerId);
+
+  updateUser(attacker.id, { balance: attacker.balance - cost });
+
+  const chance = stealChance(attacker, target);
+  const success = Math.random() < chance;
+
+  if (success) {
+    updateUser(target.id, { owner_id: attacker.id }); // keeps their existing job
+    logEvent(target.id, 'stolen', { by: attacker.id, from: oldOwnerId });
+    refreshRank(attacker.id);
+    if (oldOwner) refreshRank(oldOwner.id);
+    notify(target.id, `Тебя увели у прежнего владельца. Теперь ты у игрока ${displayName(attacker)}.`);
+    notify(oldOwnerId, `Твоего человека ${displayName(target)} увёл игрок ${displayName(attacker)}.`);
+  } else {
+    logEvent(attacker.id, 'steal_failed', { target: target.id, owner: oldOwnerId });
+    notify(oldOwnerId, `Игрок ${displayName(attacker)} пытался увести твоего человека ${displayName(target)} — не вышло.`);
   }
 
   res.json({ success, chance: Math.round(chance * 100), spent: cost, balance: getUser(attacker.id).balance });
@@ -244,7 +298,7 @@ app.post('/api/daily', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Уже забрано сегодня', next_in_hours: Math.ceil(20 - hoursSince) });
   }
   const streak = hoursSince > 48 ? 1 : me.daily_streak + 1;
-  const bonus = 70 + Math.min(streak, 10) * 25;
+  const bonus = 140 + Math.min(streak, 10) * 50;
   updateUser(me.id, { balance: me.balance + bonus, last_daily: now, daily_streak: streak });
   res.json({ bonus, streak, balance: getUser(me.id).balance });
 });
