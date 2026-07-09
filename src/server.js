@@ -12,6 +12,7 @@ const {
   successChance,
   logEvent,
   refreshRank,
+  rankFor,
   nextRankInfo,
   runRebellionTick,
   randomJob,
@@ -75,7 +76,7 @@ function publicUser(u) {
     income_per_hour: effectiveIncome(u),
     owned_count: owned,
     is_owned_by: u.owner_id,
-    rank_title: u.rank_title,
+    rank_title: rankFor(owned),
     daily_streak: u.daily_streak,
     daily_available: hoursSinceDaily >= 20,
     next_rank: nextRankInfo(owned),
@@ -298,7 +299,7 @@ app.get('/api/leaderboard', requireAuth, (req, res) => {
       first_name: u.first_name,
       balance: u.balance,
       owned_count: ownedCount(u.id),
-      rank_title: u.rank_title,
+      rank_title: rankFor(ownedCount(u.id)),
     }))
   );
 });

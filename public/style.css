@@ -508,6 +508,18 @@ main#panels {
 .mini-btn.collect { border-color: var(--green); color: var(--green); }
 .mini-btn.collect:active { background: var(--green-pale); color: #cfe9db; }
 .mini-btn.collect.just-collected { background: var(--green-pale); color: #cfe9db; }
+
+.mini-btn.buy {
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 700;
+  background:
+    linear-gradient(135deg, transparent 40%, rgba(62, 207, 142, 0.4) 50%, transparent 60%),
+    linear-gradient(180deg, rgba(62, 207, 142, 0.14), rgba(62, 207, 142, 0.02));
+  background-size: 300% 300%, 100% 100%;
+  animation: glowShimmer 2.4s ease-in-out infinite;
+}
+.mini-btn.buy:active { background: var(--green-pale); color: #cfe9db; animation: none; }
 .mini-btn.danger { border-color: var(--red); color: #f0a2a4; }
 .mini-btn.danger:active { background: var(--red-pale); }
 

@@ -54,6 +54,7 @@ function createBot({ token, webAppUrl }) {
   // Telegram asks the bot to confirm the order is still valid right before
   // charging the user. We keep this simple: if the item exists, approve it.
   bot.on('pre_checkout_query', async (ctx) => {
+    console.log('[payments] pre_checkout_query received:', ctx.preCheckoutQuery.invoice_payload);
     let payload;
     try {
       payload = JSON.parse(ctx.preCheckoutQuery.invoice_payload);
@@ -61,10 +62,16 @@ function createBot({ token, webAppUrl }) {
       payload = null;
     }
     const item = payload ? getShopItem(payload.item) : null;
-    if (item) {
-      await ctx.answerPreCheckoutQuery(true);
-    } else {
-      await ctx.answerPreCheckoutQuery(false, { error_message: 'Этот товар больше недоступен.' });
+    try {
+      if (item) {
+        await ctx.answerPreCheckoutQuery(true);
+        console.log('[payments] approved pre-checkout for item:', payload.item);
+      } else {
+        await ctx.answerPreCheckoutQuery(false, { error_message: 'Этот товар больше недоступен.' });
+        console.log('[payments] rejected pre-checkout — unknown item:', payload);
+      }
+    } catch (e) {
+      console.error('[payments] answerPreCheckoutQuery failed:', e);
     }
   });
 

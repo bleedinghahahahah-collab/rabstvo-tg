@@ -599,7 +599,7 @@ async function loadShop() {
       </div>
       <div class="row-value">${item.price} звёзд</div>
       <div class="row-actions">
-        <button class="mini-btn collect" data-key="${item.key}">Купить</button>
+        <button class="mini-btn buy" data-key="${item.key}">Купить</button>
       </div>
     `;
     row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
