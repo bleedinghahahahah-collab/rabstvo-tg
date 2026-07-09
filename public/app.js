@@ -14,7 +14,11 @@ async function api(path, options = {}) {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
+  if (!res.ok) {
+    const err = new Error(data.error || 'Ошибка сервера');
+    Object.assign(err, data); // carries through fields like cost, unlock_at, next_in_hours
+    throw err;
+  }
   return data;
 }
 
@@ -39,21 +43,59 @@ function initials(name) {
   return (name || '?').trim().slice(0, 1).toUpperCase();
 }
 
+// Fills a seal element (header or row) with a Telegram avatar photo when
+// available, falling back silently to initials if there's no photo or it
+// fails to load. `imgEl` and `initialsEl` may be the same wrapping element
+// for row seals (built via innerHTML) — see sealHtml().
+function sealHtml(id, name) {
+  return `${initials(name)}<img src="/api/avatar/${id}" alt="" onerror="this.style.display='none'" loading="lazy" />`;
+}
+
 function fmt(n) {
   return new Intl.NumberFormat('ru-RU').format(Math.floor(n));
 }
 
+function fmtDec(n) {
+  const rounded = Math.round(n * 10) / 10;
+  return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: rounded % 1 === 0 ? 0 : 1 }).format(rounded);
+}
+
 // ===== Tab switching: slide / shift transition =====
-const TAB_ORDER = ['profile', 'market', 'people', 'top', 'invite'];
+// FIX: panels used to be permanently position:absolute, which removed them
+// from normal document flow and collapsed the container's height to 0 —
+// that's what broke layout, especially visible on desktop viewports.
+// Now panels are normal flow by default, and only become position:absolute
+// (via the .transitioning class) for the ~280ms the animation runs.
+const TAB_ORDER = ['profile', 'market', 'people', 'farm', 'top', 'invite'];
+const TRANSITION_MS = 280;
 let currentTab = 'profile';
+let tabTransitionTimer = null;
 
 const tabs = document.querySelectorAll('.tab-btn');
 const panelsWrap = document.getElementById('panels');
+
+function finishPendingTransition() {
+  // if a previous transition's timer is still pending, snap it to its end
+  // state immediately so a new click can never race against it
+  if (!tabTransitionTimer) return;
+  clearTimeout(tabTransitionTimer);
+  tabTransitionTimer = null;
+  document.querySelectorAll('.panel').forEach((p) => {
+    if (p.dataset.panel !== currentTab) {
+      p.classList.remove('active', 'transitioning', 'slide-out-left', 'slide-out-right', 'slide-in-left', 'slide-in-right');
+    } else {
+      p.classList.remove('transitioning', 'slide-in-left', 'slide-in-right');
+    }
+  });
+  panelsWrap.style.minHeight = '';
+}
 
 tabs.forEach((btn) => {
   btn.addEventListener('click', () => {
     const name = btn.dataset.tab;
     if (name === currentTab) return;
+
+    finishPendingTransition(); // cancel/snap any in-flight transition first
 
     tabs.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
@@ -62,27 +104,28 @@ tabs.forEach((btn) => {
     const newPanel = document.querySelector(`.panel[data-panel="${name}"]`);
     const dir = TAB_ORDER.indexOf(name) > TAB_ORDER.indexOf(currentTab) ? 1 : -1;
 
-    // lock the container's height for the duration of the transition so the
-    // page doesn't jump while both panels are briefly overlapping
+    // measure height while still normal flow, BEFORE going absolute
     panelsWrap.style.minHeight = panelsWrap.offsetHeight + 'px';
 
-    oldPanel.classList.remove('slide-in-left', 'slide-in-right');
-    oldPanel.classList.add(dir === 1 ? 'slide-out-left' : 'slide-out-right');
+    oldPanel.classList.add('transitioning');
+    newPanel.classList.add('transitioning', 'active');
 
-    newPanel.classList.add('active');
+    // force reflow so the just-added classes are applied before we add the
+    // animation classes (otherwise the browser can skip/merge the transition)
+    void oldPanel.offsetWidth;
+
+    oldPanel.classList.add(dir === 1 ? 'slide-out-left' : 'slide-out-right');
     newPanel.classList.add(dir === 1 ? 'slide-in-right' : 'slide-in-left');
 
     loadPanel(name);
-
-    const cleanup = () => {
-      oldPanel.classList.remove('active', 'slide-out-left', 'slide-out-right');
-      newPanel.classList.remove('slide-in-right', 'slide-in-left');
-      panelsWrap.style.minHeight = '';
-      oldPanel.removeEventListener('animationend', cleanup);
-    };
-    oldPanel.addEventListener('animationend', cleanup);
-
     currentTab = name;
+
+    tabTransitionTimer = setTimeout(() => {
+      oldPanel.classList.remove('active', 'transitioning', 'slide-out-left', 'slide-out-right');
+      newPanel.classList.remove('transitioning', 'slide-in-left', 'slide-in-right');
+      panelsWrap.style.minHeight = '';
+      tabTransitionTimer = null;
+    }, TRANSITION_MS);
   });
 });
 
@@ -90,6 +133,7 @@ function loadPanel(name) {
   if (name === 'market') loadMarket();
   if (name === 'people') loadPeople();
   if (name === 'top') loadTop();
+  if (name === 'farm') loadFarmStatus();
 }
 
 // ===== Header (profile summary) =====
@@ -97,13 +141,18 @@ async function loadMe() {
   const me = await api('/api/me');
   document.getElementById('hdr-name').textContent = me.username ? '@' + me.username : me.first_name || 'Без имени';
   document.getElementById('hdr-rank').textContent = me.rank_title;
-  document.getElementById('hdr-balance').textContent = fmt(me.balance);
+  document.getElementById('hdr-balance').textContent = fmtDec(me.balance);
   document.getElementById('hdr-income').textContent = fmt(me.income_per_hour) + '/ч';
-  document.getElementById('hdr-protection').textContent = 'Ур. ' + me.protection;
+  document.getElementById('hdr-owned').textContent = fmt(me.owned_count);
   document.getElementById('hdr-status').textContent = me.is_owned_by ? 'В услужении' : 'Свободен';
-  document.getElementById('seal').textContent = initials(me.username || me.first_name);
 
-  document.getElementById('protect-cost').textContent = '';
+  document.getElementById('seal-initials').textContent = initials(me.username || me.first_name);
+  // Telegram gives us our OWN photo directly in initData — no round trip needed
+  const ownPhoto = tg?.initDataUnsafe?.user?.photo_url;
+  const avatarImg = document.getElementById('seal-avatar');
+  avatarImg.src = ownPhoto || `/api/avatar/${me.id}`;
+  avatarImg.onerror = () => { avatarImg.style.display = 'none'; };
+
   document.getElementById('ransom-hint').style.display = me.is_owned_by ? 'block' : 'none';
   document.getElementById('btn-ransom').style.opacity = me.is_owned_by ? '1' : '.45';
   document.getElementById('btn-ransom').disabled = !me.is_owned_by;
@@ -119,16 +168,6 @@ document.getElementById('btn-daily').addEventListener('click', async () => {
     loadMe();
   } catch (e) {
     toast(e.message);
-  }
-});
-
-document.getElementById('btn-protect').addEventListener('click', async () => {
-  try {
-    const r = await api('/api/protect', { method: 'POST' });
-    toast(`Защита повышена до уровня ${r.protection}`);
-    loadMe();
-  } catch (e) {
-    toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
   }
 });
 
@@ -158,7 +197,7 @@ async function loadMarket() {
     row.className = 'ledger-row';
     row.style.flexWrap = 'wrap';
     row.innerHTML = `
-      <div class="row-seal">${initials(p.username || p.first_name)}</div>
+      <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
       <div class="row-name">${name}</div>
       <div class="row-leader"></div>
       <div class="row-value">${fmt(p.cost)}</div>
@@ -201,15 +240,31 @@ async function loadPeople() {
     row.className = 'ledger-row';
     row.style.flexWrap = 'wrap';
     row.innerHTML = `
-      <div class="row-seal">${initials(p.username || p.first_name)}</div>
-      <div class="row-name">${name}</div>
-      <div class="row-leader"></div>
-      <div class="row-value">${fmt(p.balance)}</div>
+      <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
+      <div style="min-width:0;flex:1;">
+        <div class="row-name">${name}</div>
+        <div class="row-meta">${p.job_name} · ${fmt(p.job_income)}/ч</div>
+      </div>
+      <div class="row-value">+${fmtDec(p.pending_income)}</div>
       <div class="row-actions">
-        <button class="mini-btn danger" data-id="${p.id}">Отпустить</button>
+        <button class="mini-btn" data-action="collect" data-id="${p.id}">Забрать доход</button>
+        <button class="mini-btn danger" data-action="free" data-id="${p.id}">Отпустить</button>
       </div>
     `;
-    row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
+    row.querySelector('[data-action="collect"]').addEventListener('click', async (ev) => {
+      ev.target.disabled = true;
+      try {
+        const r = await api(`/api/collect/${p.id}`, { method: 'POST' });
+        toast(`Собрано: +${fmtDec(r.gained)}`);
+        loadPeople();
+        loadMe();
+      } catch (e) {
+        toast(e.message);
+      } finally {
+        ev.target.disabled = false;
+      }
+    });
+    row.querySelector('[data-action="free"]').addEventListener('click', async (ev) => {
       ev.target.disabled = true;
       try {
         await api(`/api/free/${p.id}`, { method: 'POST' });
@@ -237,7 +292,7 @@ async function loadTop() {
     row.className = 'ledger-row';
     row.innerHTML = `
       <div class="rank-badge">#${p.rank}</div>
-      <div class="row-seal">${initials(p.username || p.first_name)}</div>
+      <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
       <div>
         <div class="row-name">${name}</div>
         <div class="row-meta">${p.rank_title} · ${p.owned_count} чел. в подчинении</div>
@@ -249,7 +304,99 @@ async function loadTop() {
   });
 }
 
-// ===== Invite tab =====
+// ===== Farm tab =====
+const FARM_MIN_INTERVAL_MS = 250; // matches server-side limit: 4 taps/sec
+let farmLastClientTap = 0;
+let farmLocked = false;
+let farmCountdownTimer = null;
+
+async function loadFarmStatus() {
+  try {
+    const status = await api('/api/farm/status');
+    applyFarmStatus(status);
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+function applyFarmStatus(status) {
+  const counterEl = document.getElementById('farm-counter');
+  const btn = document.getElementById('farm-btn');
+  const lockHint = document.getElementById('farm-lock-hint');
+
+  counterEl.textContent = `${status.taps_used} / ${status.taps_limit}`;
+  farmLocked = !!status.locked;
+
+  clearInterval(farmCountdownTimer);
+
+  if (farmLocked) {
+    btn.classList.add('locked');
+    btn.disabled = true;
+    updateFarmLockCountdown(status.unlock_at);
+    farmCountdownTimer = setInterval(() => updateFarmLockCountdown(status.unlock_at), 1000);
+    lockHint.style.display = 'block';
+  } else {
+    btn.classList.remove('locked');
+    btn.disabled = false;
+    lockHint.style.display = 'none';
+  }
+}
+
+function updateFarmLockCountdown(unlockAt) {
+  const lockHint = document.getElementById('farm-lock-hint');
+  const msLeft = unlockAt - Date.now();
+  if (msLeft <= 0) {
+    clearInterval(farmCountdownTimer);
+    loadFarmStatus();
+    return;
+  }
+  const totalSec = Math.ceil(msLeft / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  lockHint.textContent = `Лимит тапов исчерпан. Обновится через ${pad(h)}:${pad(m)}:${pad(s)}. Придёт уведомление от бота.`;
+}
+
+function spawnFarmParticle(btn) {
+  const particle = document.createElement('div');
+  particle.className = 'farm-particle';
+  particle.textContent = '+0.2';
+  const angle = Math.random() * Math.PI * 2;
+  const distance = 60 + Math.random() * 40;
+  particle.style.setProperty('--fx', `${Math.cos(angle) * distance}px`);
+  particle.style.setProperty('--fy', `${Math.sin(angle) * distance}px`);
+  btn.parentElement.appendChild(particle);
+  setTimeout(() => particle.remove(), 750);
+}
+
+function bumpCounter() {
+  const counterEl = document.getElementById('farm-counter');
+  counterEl.classList.remove('bump');
+  void counterEl.offsetWidth;
+  counterEl.classList.add('bump');
+}
+
+document.getElementById('farm-btn').addEventListener('click', async (ev) => {
+  if (farmLocked) return;
+
+  const now = Date.now();
+  if (now - farmLastClientTap < FARM_MIN_INTERVAL_MS) return; // client-side throttle, mirrors server limit
+  farmLastClientTap = now;
+
+  spawnFarmParticle(ev.currentTarget);
+  bumpCounter();
+
+  try {
+    const r = await api('/api/farm/tap', { method: 'POST' });
+    document.getElementById('farm-counter').textContent = `${r.taps_used} / 5000`;
+    document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
+    if (r.locked) applyFarmStatus({ locked: true, taps_used: r.taps_used, taps_limit: 5000, unlock_at: r.unlock_at });
+  } catch (e) {
+    if (e.unlock_at) applyFarmStatus({ locked: true, taps_used: 5000, taps_limit: 5000, unlock_at: e.unlock_at });
+    // "too fast" errors are silently ignored — the tap just doesn't register
+  }
+});
 document.getElementById('btn-copy-link').addEventListener('click', async () => {
   try {
     const { link } = await api('/api/invite-link');

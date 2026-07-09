@@ -43,9 +43,9 @@ function upsertUser({ id, username, first_name, ref_by }) {
       id,
       username: username || null,
       first_name: first_name || null,
-      balance: 200,
+      balance: 300,
       protection: 1,
-      income_per_hour: 10,
+      income_per_hour: 20,
       owner_id: null,
       last_claim: Math.floor(Date.now() / 1000),
       last_daily: 0,
@@ -53,6 +53,10 @@ function upsertUser({ id, username, first_name, ref_by }) {
       ref_by: ref_by || null,
       rank_title: 'Бродяга',
       created_at: Math.floor(Date.now() / 1000),
+      // farm tap-to-earn state
+      farm_taps: 0,
+      farm_last_tap: 0,
+      farm_cooldown_until: 0,
     };
     state.users[id] = u;
   }

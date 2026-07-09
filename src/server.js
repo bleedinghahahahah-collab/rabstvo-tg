@@ -10,10 +10,16 @@ const {
   ownedCount,
   acquisitionCost,
   successChance,
-  protectionCost,
   logEvent,
   refreshRank,
   runRebellionTick,
+  randomJob,
+  jobByKey,
+  personPendingIncome,
+  collectFromPerson,
+  farmStatus,
+  tryFarmTap,
+  runFarmCooldownTick,
 } = require('./game');
 const { verifyInitData } = require('./auth');
 const { createBot } = require('./bot');
@@ -104,13 +110,17 @@ app.post('/api/acquire', requireAuth, (req, res) => {
   const success = Math.random() < chance;
 
   if (success) {
-    updateUser(target.id, { owner_id: attacker.id });
-    logEvent(target.id, 'acquired', { by: attacker.id });
+    const job = randomJob();
+    updateUser(target.id, { owner_id: attacker.id, job: job.key, income_last_claim: Math.floor(Date.now() / 1000) });
+    logEvent(target.id, 'acquired', { by: attacker.id, job: job.key });
     refreshRank(attacker.id);
-    notify(target.id, `⛓ Тебя поработил игрок ${displayName(attacker)}. Заработай на выкуп в разделе «Мои люди».`);
+    notify(
+      target.id,
+      `Тебя поработил игрок ${displayName(attacker)}. Твоя новая работа: ${job.name}. Заработай на выкуп в разделе «Мои люди».`
+    );
   } else {
     logEvent(attacker.id, 'raid_failed', { target: target.id });
-    notify(target.id, `🛡 Игрок ${displayName(attacker)} попытался тебя захватить — твоя защита выстояла.`);
+    notify(target.id, `Игрок ${displayName(attacker)} попытался тебя захватить — твоя защита выстояла.`);
   }
 
   res.json({ success, chance: Math.round(chance * 100), spent: cost, balance: getUser(attacker.id).balance });
@@ -120,14 +130,35 @@ app.post('/api/acquire', requireAuth, (req, res) => {
 app.get('/api/my-people', requireAuth, (req, res) => {
   const rows = ownedBy(req.userId).sort((a, b) => b.balance - a.balance);
   res.json(
-    rows.map((u) => ({
-      id: u.id,
-      username: u.username,
-      first_name: u.first_name,
-      balance: u.balance,
-      ransom_cost: Math.max(50, Math.floor(u.balance * 0.4) + 50),
-    }))
+    rows.map((u) => {
+      const job = jobByKey(u.job);
+      return {
+        id: u.id,
+        username: u.username,
+        first_name: u.first_name,
+        balance: u.balance,
+        ransom_cost: Math.max(50, Math.floor(u.balance * 0.4) + 50),
+        job_name: job ? job.name : 'Без определённой профессии',
+        job_blurb: job ? job.blurb : 'Пока просто числится.',
+        job_income: job ? job.income : 6,
+        pending_income: personPendingIncome(u),
+      };
+    })
   );
+});
+
+// ---- POST /api/collect/:id — collect accrued income from one owned person ----
+app.post('/api/collect/:id', requireAuth, (req, res) => {
+  const person = getUser(Number(req.params.id));
+  if (!person || person.owner_id !== req.userId) return res.status(400).json({ error: 'Это не твой человек' });
+
+  const gained = collectFromPerson(person);
+  if (gained <= 0) return res.status(400).json({ error: 'Пока нечего забирать' });
+
+  const me = getUser(req.userId);
+  updateUser(req.userId, { balance: Math.round((me.balance + gained) * 10) / 10 });
+
+  res.json({ ok: true, gained, balance: getUser(req.userId).balance });
 });
 
 // ---- POST /api/free/:id — release someone you own, no charge ----
@@ -137,7 +168,7 @@ app.post('/api/free/:id', requireAuth, (req, res) => {
   updateUser(person.id, { owner_id: null });
   logEvent(person.id, 'freed', { by: req.userId });
   refreshRank(req.userId);
-  notify(person.id, `🕊 Тебя отпустили на свободу.`);
+  notify(person.id, `Тебя отпустили на свободу.`);
   res.json({ ok: true });
 });
 
@@ -151,18 +182,34 @@ app.post('/api/ransom', requireAuth, (req, res) => {
   updateUser(me.id, { balance: me.balance - cost, owner_id: null });
   logEvent(me.id, 'ransomed', { from: oldOwner });
   refreshRank(oldOwner);
-  notify(oldOwner, `💰 Один из твоих людей выкупил свою свободу.`);
+  notify(oldOwner, `Один из твоих людей выкупил свою свободу.`);
   res.json({ ok: true, balance: getUser(me.id).balance });
 });
 
-// ---- POST /api/protect — upgrade own protection level ----
-app.post('/api/protect', requireAuth, (req, res) => {
-  const me = getUser(req.userId);
-  const cost = protectionCost(me.protection);
-  if (me.balance < cost) return res.status(400).json({ error: 'Недостаточно монет', cost });
-  updateUser(me.id, { balance: me.balance - cost, protection: me.protection + 1 });
-  const updated = getUser(me.id);
-  res.json({ ok: true, protection: updated.protection, balance: updated.balance });
+// ---- GET /api/avatar/:id — proxies a user's Telegram profile photo.
+// Fetches it server-side via the Bot API so the bot token never reaches
+// the client (embedding it directly in an <img src> would leak it). ----
+app.get('/api/avatar/:id', requireAuth, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const photos = await bot.api.getUserProfilePhotos(userId, { limit: 1 });
+    if (!photos.total_count) return res.status(404).end();
+
+    const sizes = photos.photos[0];
+    const fileId = sizes[0].file_id; // smallest size — plenty for a small avatar circle
+    const file = await bot.api.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+
+    const upstream = await fetch(fileUrl);
+    if (!upstream.ok) return res.status(404).end();
+
+    res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=3600');
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    res.send(buffer);
+  } catch (e) {
+    res.status(404).end();
+  }
 });
 
 // ---- GET /api/leaderboard ----
@@ -195,6 +242,27 @@ app.post('/api/daily', requireAuth, (req, res) => {
   res.json({ bonus, streak, balance: getUser(me.id).balance });
 });
 
+// ---- GET /api/farm/status ----
+app.get('/api/farm/status', requireAuth, (req, res) => {
+  const me = getUser(req.userId);
+  res.json(farmStatus(me));
+});
+
+// ---- POST /api/farm/tap ----
+app.post('/api/farm/tap', requireAuth, (req, res) => {
+  const result = tryFarmTap(req.userId);
+  if (!result.ok) {
+    if (result.error === 'locked') {
+      return res.status(429).json({ error: 'Лимит тапов исчерпан, жди обновления', unlock_at: result.unlock_at });
+    }
+    if (result.error === 'too_fast') {
+      return res.status(429).json({ error: 'Слишком быстро' });
+    }
+    return res.status(400).json({ error: 'Не удалось' });
+  }
+  res.json(result);
+});
+
 // ---- GET /api/invite-link ----
 app.get('/api/invite-link', requireAuth, async (req, res) => {
   const me = await bot.api.getMe();
@@ -213,6 +281,13 @@ function notify(userId, text) {
 
 // ---- background tick: rebellions roll every 10 minutes ----
 setInterval(runRebellionTick, 10 * 60 * 1000);
+
+// ---- background tick: check every minute whether anyone's farm cooldown just expired ----
+setInterval(() => {
+  runFarmCooldownTick((userId) => {
+    notify(userId, 'Лимит тапов на ферме обновился — можно снова собирать монеты.');
+  });
+}, 60 * 1000);
 
 // ---- bot: webhook in production, long polling in local dev ----
 if (USE_WEBHOOK) {

@@ -1,6 +1,6 @@
 const { Bot, InlineKeyboard } = require('grammy');
 const { upsertUser, getUser, updateUser } = require('./db');
-const { logEvent } = require('./game');
+const { logEvent, randomJob } = require('./game');
 
 function createBot({ token, webAppUrl }) {
   const bot = new Bot(token);
@@ -27,13 +27,19 @@ function createBot({ token, webAppUrl }) {
     if (!alreadyExists && refBy) {
       const inviter = getUser(refBy);
       if (inviter) {
+        const job = randomJob();
         updateUser(refBy, { balance: inviter.balance + 150 });
-        updateUser(user.id, { balance: user.balance + 100, owner_id: refBy });
-        logEvent(refBy, 'acquired', { person_id: user.id, via: 'referral' });
+        updateUser(user.id, {
+          balance: user.balance + 100,
+          owner_id: refBy,
+          job: job.key,
+          income_last_claim: Math.floor(Date.now() / 1000),
+        });
+        logEvent(refBy, 'acquired', { person_id: user.id, via: 'referral', job: job.key });
       }
     }
 
-    const kb = new InlineKeyboard().webApp('🕯 Открыть игру', webAppUrl);
+    const kb = new InlineKeyboard().webApp('Открыть игру', webAppUrl);
     ctx.reply(
       'Добро пожаловать в подполье.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.',
       { reply_markup: kb }

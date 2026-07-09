@@ -1,14 +1,12 @@
 :root {
   --ink: #050505;
   --ink-raised: rgba(20, 20, 20, 0.92);
-  --ink-raised-solid: #141414;
   --paper: #F0F0F0;
   --gray-accent: #9a9a9a;
   --gray-bright: #E4E4E4;
-  --gray-line: #3a3a3a;
+  --gray-line: #333333;
   --gray-muted: #7a7a7a;
-  --font-display: 'Cinzel', serif;
-  --font-body: 'Manrope', sans-serif;
+  --font-body: 'Open Sans', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -24,8 +22,9 @@ html, body {
 }
 
 /* ===================================================================
-   Animated chain backdrop — two crossing layers of tiled chain-link
-   SVG art, slowly drifting to feel like the chains are shifting/settling.
+   Chain backdrop — the user's own photo, at 50% opacity, slowly panning
+   back and forth (not tiled — it's a single image, so a gentle Ken-Burns
+   style drift reads as "moving chains" without visible seams).
    =================================================================== */
 .chain-backdrop {
   position: fixed;
@@ -37,41 +36,24 @@ html, body {
 
 .chain-layer {
   position: absolute;
-  top: -60%;
-  left: -60%;
-  width: 220%;
-  height: 220%;
-  background-repeat: repeat;
-  filter: grayscale(1);
+  inset: -8%;
+  background-image: url("assets/chains-bg.jpg");
+  background-size: 120%;
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+  opacity: 0.5;
+  filter: grayscale(0.3);
+  animation: chainDrift 34s ease-in-out infinite alternate;
 }
 
-.chain-layer-a {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='34'%3E%3Crect x='4' y='7' width='26' height='20' rx='10' fill='none' stroke='%23888888' stroke-width='5'/%3E%3Crect x='32' y='4' width='20' height='26' rx='10' fill='none' stroke='%23888888' stroke-width='5' transform='rotate(90 42 17)'/%3E%3C/svg%3E");
-  background-size: 70px 34px;
-  transform: rotate(38deg);
-  opacity: 0.4;
-  animation: chainDriftA 26s linear infinite;
-}
-
-.chain-layer-b {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='34'%3E%3Crect x='4' y='7' width='26' height='20' rx='10' fill='none' stroke='%23666666' stroke-width='5'/%3E%3Crect x='32' y='4' width='20' height='26' rx='10' fill='none' stroke='%23666666' stroke-width='5' transform='rotate(90 42 17)'/%3E%3C/svg%3E");
-  background-size: 84px 40px;
-  transform: rotate(-42deg);
-  opacity: 0.26;
-  animation: chainDriftB 32s linear infinite;
-}
-
-@keyframes chainDriftA {
-  from { background-position: 0 0; }
-  to { background-position: 700px 0; }
-}
-@keyframes chainDriftB {
-  from { background-position: 0 0; }
-  to { background-position: -840px 0; }
+@keyframes chainDrift {
+  0%   { background-position: 30% 30%; transform: scale(1); }
+  50%  { background-position: 60% 55%; transform: scale(1.04); }
+  100% { background-position: 40% 65%; transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chain-layer-a, .chain-layer-b { animation: none; }
+  .chain-layer { animation: none; }
 }
 
 #app {
@@ -91,12 +73,15 @@ html, body {
   align-items: center;
   gap: 14px;
   padding: 18px 16px 10px;
-  background: linear-gradient(180deg, var(--ink-raised) 0%, rgba(5,5,5,0.94) 100%);
+  background: rgba(6, 6, 6, 0.9);
   border-bottom: 1px solid var(--gray-line);
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(3px);
 }
 
-.ledger-seal {
+/* Avatar seal: initials sit underneath, the Telegram photo (if any) covers
+   them once it loads; onerror hides the img so initials show through. */
+.seal {
+  position: relative;
   flex: 0 0 auto;
   width: 46px;
   height: 46px;
@@ -105,19 +90,24 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
+  overflow: hidden;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 16px;
   color: var(--gray-bright);
-  background: radial-gradient(circle at 35% 30%, #232323, #050505);
-  box-shadow: 0 0 0 4px rgba(154, 154, 154, 0.1);
+  background: #1a1a1a;
+}
+.seal img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .ledger-main { flex: 1 1 auto; min-width: 0; }
 
 .ledger-name {
-  font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--paper);
   white-space: nowrap;
@@ -128,21 +118,18 @@ html, body {
 .ledger-title {
   font-size: 12px;
   color: var(--gray-bright);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   margin-top: 2px;
+  font-weight: 600;
 }
 
-.ledger-balance {
-  flex: 0 0 auto;
-  text-align: right;
-}
+.ledger-balance { flex: 0 0 auto; text-align: right; }
 
 .balance-figure {
   display: block;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 22px;
+  font-size: 21px;
   color: var(--gray-bright);
 }
 
@@ -158,16 +145,16 @@ html, body {
   padding: 10px 16px 14px;
   gap: 10px;
   border-bottom: 1px solid var(--gray-line);
-  background: rgba(5, 5, 5, 0.9);
-  backdrop-filter: blur(2px);
+  background: rgba(5, 5, 5, 0.88);
+  backdrop-filter: blur(3px);
 }
 
 .substat {
   flex: 1;
   background: var(--ink-raised);
   border: 1px solid var(--gray-line);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 9px 10px;
   text-align: center;
 }
 
@@ -177,18 +164,27 @@ html, body {
   color: var(--gray-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .substat-value {
   display: block;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--paper);
 }
 
-/* ===== Panels / tabs — slide transitions ===== */
+/* ===================================================================
+   Panels / tabs — FIX: panels used to be `position:absolute` at all
+   times, which pulled them out of normal flow and collapsed #panels to
+   zero height (absolutely positioned elements don't contribute to a
+   parent's height). That's what caused the layout to break, especially
+   noticeable on wide/desktop viewports. Fix: panels are normal flow
+   (position:static) by default and only become position:absolute for
+   the brief moment they're mid-transition, so the container always has
+   a correct height the rest of the time.
+   =================================================================== */
 main#panels {
   flex: 1;
   padding: 18px 16px 8px;
@@ -196,37 +192,41 @@ main#panels {
 }
 
 .panel { display: none; }
-.panel.active {
-  display: block;
+.panel.active { display: block; }
+
+.panel.transitioning {
   position: absolute;
-  inset: 18px 16px 8px;
+  left: 16px;
+  right: 16px;
+  top: 18px;
 }
 
-.panel.slide-in-right { animation: slideInRight .3s cubic-bezier(.22,.8,.32,1) forwards; }
-.panel.slide-in-left  { animation: slideInLeft  .3s cubic-bezier(.22,.8,.32,1) forwards; }
-.panel.slide-out-right { animation: slideOutRight .3s cubic-bezier(.5,0,.75,.2) forwards; }
-.panel.slide-out-left  { animation: slideOutLeft  .3s cubic-bezier(.5,0,.75,.2) forwards; }
+.panel.slide-in-right { animation: slideInRight .28s ease forwards; }
+.panel.slide-in-left  { animation: slideInLeft  .28s ease forwards; }
+.panel.slide-out-right { animation: slideOutRight .28s ease forwards; }
+.panel.slide-out-left  { animation: slideOutLeft  .28s ease forwards; }
 
-@keyframes slideInRight { from { transform: translateX(38px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes slideInLeft  { from { transform: translateX(-38px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes slideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-38px); opacity: 0; } }
-@keyframes slideOutLeft  { from { transform: translateX(0); opacity: 1; } to { transform: translateX(38px); opacity: 0; } }
+@keyframes slideInRight { from { transform: translateX(32px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideInLeft  { from { transform: translateX(-32px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-32px); opacity: 0; } }
+@keyframes slideOutLeft  { from { transform: translateX(0); opacity: 1; } to { transform: translateX(32px); opacity: 0; } }
 
 .section-title { margin-bottom: 14px; }
 .eyebrow {
   font-size: 11px;
   color: var(--gray-accent);
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.08em;
+  font-weight: 600;
 }
 .section-title h2 {
-  font-family: var(--font-display);
-  font-size: 22px;
-  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 3px 0 0;
   color: var(--paper);
 }
 
-/* ===== Ledger list rows ===== */
+/* ===== List rows ===== */
 .list { display: flex; flex-direction: column; gap: 8px; }
 
 .ledger-row {
@@ -235,11 +235,12 @@ main#panels {
   gap: 10px;
   background: var(--ink-raised);
   border: 1px solid var(--gray-line);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 12px 12px;
 }
 
 .row-seal {
+  position: relative;
   flex: 0 0 auto;
   width: 34px;
   height: 34px;
@@ -248,10 +249,18 @@ main#panels {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
+  overflow: hidden;
   font-weight: 700;
   font-size: 13px;
   color: var(--gray-bright);
+  background: #1a1a1a;
+}
+.row-seal img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .row-name {
@@ -264,7 +273,7 @@ main#panels {
 
 .row-leader {
   flex: 1;
-  border-bottom: 1px dotted #4a4a4a;
+  border-bottom: 1px dotted #444;
   margin: 0 6px;
   min-width: 12px;
   transform: translateY(-3px);
@@ -280,20 +289,8 @@ main#panels {
 }
 
 .row-actions { display: flex; gap: 6px; margin-top: 8px; width: 100%; }
-
-.row-meta {
-  font-size: 10.5px;
-  color: var(--gray-muted);
-  margin-top: 2px;
-}
-
-.rank-badge {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--gray-bright);
-  width: 22px;
-  text-align: center;
-}
+.row-meta { font-size: 10.5px; color: var(--gray-muted); margin-top: 2px; }
+.rank-badge { font-family: var(--font-mono); font-size: 11px; color: var(--gray-bright); width: 22px; text-align: center; }
 
 .empty-state {
   text-align: center;
@@ -302,84 +299,125 @@ main#panels {
   font-size: 13px;
 }
 
-/* ===================================================================
-   Buttons — 3D press: on tap the button sinks in, its cast shadow
-   shrinks, and the surface darkens slightly, like a real mechanical
-   arcade / gamepad button.
-   =================================================================== */
+/* ===== Farm tab ===== */
+.farm-counter-wrap { text-align: center; margin-bottom: 28px; }
+.farm-counter {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--gray-bright);
+  transition: transform .1s ease;
+}
+.farm-counter.bump { transform: scale(1.1); }
+.farm-counter-label {
+  font-size: 11px;
+  color: var(--gray-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+}
+
+.farm-btn-wrap {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  height: 220px;
+  align-items: center;
+}
+
+.farm-btn {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  border-radius: 50%;
+  border: 3px solid var(--gray-accent);
+  background:
+    linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%),
+    radial-gradient(circle at 35% 30%, #333, #0a0a0a 70%);
+  background-size: 300% 300%, 100% 100%;
+  background-position: 0% 0%, 0 0;
+  color: var(--gray-bright);
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: 0 6px 0 #000, 0 12px 22px rgba(0,0,0,0.5);
+  transition: transform .06s ease, box-shadow .06s ease;
+  animation: farmShimmer 2.6s ease-in-out infinite;
+  overflow: visible;
+}
+.farm-btn:active { transform: translateY(5px) scale(0.97); box-shadow: 0 1px 0 #000, 0 3px 8px rgba(0,0,0,0.4); }
+.farm-btn.locked { animation: none; opacity: 0.4; border-color: var(--gray-line); }
+@keyframes farmShimmer {
+  0%   { background-position: 0% 0%, 0 0; }
+  50%  { background-position: 100% 100%, 0 0; }
+  100% { background-position: 0% 0%, 0 0; }
+}
+
+.farm-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--gray-bright);
+  pointer-events: none;
+  animation: farmParticleFly .7s ease-out forwards;
+}
+@keyframes farmParticleFly {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(0.8); }
+  100% { opacity: 0; transform: translate(var(--fx), var(--fy)) scale(1.1); }
+}
+
+/* ===== Buttons — 3D press ===== */
 .mini-btn {
   flex: 1;
   border: 1px solid var(--gray-accent);
-  background: #1c1c1c;
+  background: #181818;
   color: var(--gray-bright);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 12px;
   padding: 8px 6px;
-  border-radius: 8px;
-  box-shadow: 0 3px 0 #050505, 0 5px 8px rgba(0,0,0,0.45);
+  border-radius: 7px;
+  box-shadow: 0 3px 0 #050505, 0 5px 8px rgba(0,0,0,0.4);
   transition: transform .08s ease, box-shadow .08s ease, background .12s ease;
 }
-.mini-btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 0 0 #050505, 0 1px 2px rgba(0,0,0,0.3);
-  background: #111;
-}
-.mini-btn.danger {
-  border-color: var(--gray-muted);
-  color: var(--paper);
-  border-style: dashed;
-}
+.mini-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #050505, 0 1px 2px rgba(0,0,0,0.3); background: #101010; }
+.mini-btn.danger { border-color: var(--gray-muted); color: var(--paper); border-style: dashed; }
 
 .action-btn {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #181818;
+  background: #151515;
   border: 1px solid var(--gray-line);
   color: var(--paper);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 14px;
-  padding: 14px 14px;
-  border-radius: 12px;
+  padding: 14px;
+  border-radius: 10px;
   margin-bottom: 10px;
-  box-shadow: 0 4px 0 #000, 0 7px 12px rgba(0,0,0,0.5);
+  box-shadow: 0 3px 0 #000, 0 6px 10px rgba(0,0,0,0.45);
   transition: transform .08s ease, box-shadow .08s ease, background .12s ease;
 }
-.action-btn.primary {
-  border-color: var(--gray-accent);
-  background: linear-gradient(180deg, rgba(154,154,154,0.16), rgba(154,154,154,0.04));
-}
-.action-btn:active {
-  transform: translateY(4px);
-  box-shadow: 0 0 0 #000, 0 1px 3px rgba(0,0,0,0.35);
-  background: #101010;
-}
-.btn-sub {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--gray-bright);
-}
+.action-btn.primary { border-color: var(--gray-accent); background: linear-gradient(180deg, rgba(154,154,154,0.14), rgba(154,154,154,0.03)); }
+.action-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #000, 0 1px 3px rgba(0,0,0,0.3); background: #0e0e0e; }
+.btn-sub { font-family: var(--font-mono); font-size: 11.5px; color: var(--gray-bright); }
 
 .hint-box {
   font-size: 12.5px;
   color: var(--gray-muted);
   background: var(--ink-raised);
   border: 1px dashed var(--gray-line);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 12px;
   margin-top: 4px;
   word-break: break-all;
 }
 
-.invite-copy {
-  font-size: 13.5px;
-  color: var(--gray-muted);
-  line-height: 1.5;
-  margin-bottom: 16px;
-}
+.invite-copy { font-size: 13.5px; color: var(--gray-muted); line-height: 1.5; margin-bottom: 16px; }
 
 /* ===== Bottom tab bar ===== */
 .tabbar {
@@ -390,9 +428,9 @@ main#panels {
   width: 100%;
   max-width: 480px;
   display: flex;
-  background: rgba(14, 14, 14, 0.96);
+  background: rgba(12, 12, 12, 0.96);
   border-top: 1px solid var(--gray-line);
-  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  padding: 10px 4px calc(10px + env(safe-area-inset-bottom));
   z-index: 2;
   backdrop-filter: blur(4px);
 }
@@ -403,33 +441,25 @@ main#panels {
   border: none;
   color: #6b6b6b;
   font-family: var(--font-body);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 6px 2px;
-  border-radius: 10px;
-  transition: transform .08s ease, background .12s ease, color .12s ease;
+  padding: 8px 2px;
+  border-radius: 8px;
+  transition: background .12s ease, color .12s ease;
 }
-.tab-btn .tab-icon { font-size: 18px; filter: grayscale(1); }
 .tab-btn.active { color: var(--gray-bright); background: rgba(154, 154, 154, 0.12); }
-.tab-btn:active { transform: scale(0.92); }
+.tab-btn:active { background: rgba(154, 154, 154, 0.08); }
 
-/* ===================================================================
-   Toast — pop-up & bounce: scales from 0 -> 110% -> settles at 100%,
-   used for purchase confirmations and "you've been enslaved" alerts.
-   =================================================================== */
+/* ===== Toast — pop-up & bounce ===== */
 #toast {
   position: fixed;
   left: 50%;
   bottom: 90px;
-  background: #161616;
+  background: #131313;
   border: 1px solid var(--gray-accent);
   color: var(--paper);
   padding: 10px 16px;
-  border-radius: 10px;
+  border-radius: 9px;
   font-size: 13px;
   max-width: 90%;
   opacity: 0;
@@ -438,16 +468,12 @@ main#panels {
   z-index: 50;
   box-shadow: 0 6px 20px rgba(0,0,0,0.6);
 }
-#toast.show {
-  animation: popBounce .42s cubic-bezier(.34, 1.56, .64, 1) forwards;
-}
-#toast.hide {
-  animation: popFade .18s ease forwards;
-}
+#toast.show { animation: popBounce .42s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+#toast.hide { animation: popFade .18s ease forwards; }
 @keyframes popBounce {
-  0%   { transform: translateX(-50%) scale(0);    opacity: 0; }
-  60%  { transform: translateX(-50%) scale(1.1);   opacity: 1; }
-  100% { transform: translateX(-50%) scale(1);     opacity: 1; }
+  0%   { transform: translateX(-50%) scale(0);  opacity: 0; }
+  60%  { transform: translateX(-50%) scale(1.1); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1);   opacity: 1; }
 }
 @keyframes popFade {
   from { transform: translateX(-50%) scale(1); opacity: 1; }
