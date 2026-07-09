@@ -135,7 +135,7 @@ function refreshRank(userId) {
 const FARM_REWARD = 0.2;
 const FARM_TAP_LIMIT = 5000;
 const FARM_COOLDOWN_MS = 3 * 60 * 60 * 1000;
-const FARM_MIN_INTERVAL_MS = 250; // 1000ms / 4 taps per second
+const FARM_MIN_INTERVAL_MS = 110; // ~9 taps/sec — fast enough for two-finger alternating taps
 
 function farmStatus(user) {
   const now = Date.now();

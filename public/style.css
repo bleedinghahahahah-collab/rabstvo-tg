@@ -38,7 +38,7 @@ html, body {
   position: absolute;
   inset: -8%;
   background-image: url("assets/chains-bg.jpg");
-  background-size: 120%;
+  background-size: cover;
   background-repeat: no-repeat;
   background-position: 50% 50%;
   opacity: 0.5;
@@ -449,6 +449,58 @@ main#panels {
 }
 .tab-btn.active { color: var(--gray-bright); background: rgba(154, 154, 154, 0.12); }
 .tab-btn:active { background: rgba(154, 154, 154, 0.08); }
+
+/* ===== Big in-app alert: "you've been enslaved" ===== */
+#big-alert {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  padding: 24px;
+}
+#big-alert.show { display: flex; }
+#big-alert-card {
+  background: #111;
+  border: 2px solid var(--gray-accent);
+  border-radius: 14px;
+  padding: 28px 22px;
+  text-align: center;
+  max-width: 340px;
+  transform: scale(0);
+}
+#big-alert.show #big-alert-card { animation: bigAlertPop .5s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+@keyframes bigAlertPop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+#big-alert-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--gray-bright);
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+#big-alert-body {
+  font-size: 14px;
+  color: var(--gray-muted);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+#big-alert-close {
+  border: 1px solid var(--gray-accent);
+  background: #1c1c1c;
+  color: var(--gray-bright);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 22px;
+  border-radius: 8px;
+}
+#big-alert-close:active { background: #0e0e0e; }
 
 /* ===== Toast — pop-up & bounce ===== */
 #toast {

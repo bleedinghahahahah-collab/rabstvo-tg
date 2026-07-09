@@ -137,6 +137,8 @@ function loadPanel(name) {
 }
 
 // ===== Header (profile summary) =====
+let previousOwnerStatus = undefined; // undefined = not known yet (first load)
+
 async function loadMe() {
   const me = await api('/api/me');
   document.getElementById('hdr-name').textContent = me.username ? '@' + me.username : me.first_name || 'Без имени';
@@ -157,8 +159,33 @@ async function loadMe() {
   document.getElementById('btn-ransom').style.opacity = me.is_owned_by ? '1' : '.45';
   document.getElementById('btn-ransom').disabled = !me.is_owned_by;
 
+  // Detect the free -> owned transition and show a big in-app alert.
+  // (previousOwnerStatus stays `undefined` on the very first load so we
+  // never fire this just because the app opened while already enslaved.)
+  if (previousOwnerStatus === false && me.is_owned_by) {
+    showBigAlert();
+  }
+  previousOwnerStatus = !!me.is_owned_by;
+
   return me;
 }
+
+function showBigAlert() {
+  const overlay = document.getElementById('big-alert');
+  overlay.classList.add('show');
+  tg?.HapticFeedback?.notificationOccurred?.('warning');
+}
+
+document.getElementById('big-alert-close').addEventListener('click', () => {
+  document.getElementById('big-alert').classList.remove('show');
+});
+
+// Poll periodically so status (enslaved/freed/income) stays fresh even if
+// the mini app is just left open in the background — the mechanism behind
+// the "ВАС ВЗЯЛИ В РАБСТВО!!!" alert above.
+setInterval(() => {
+  loadMe().catch(() => {});
+}, 8000);
 
 // ===== Profile tab actions =====
 document.getElementById('btn-daily').addEventListener('click', async () => {
@@ -305,7 +332,7 @@ async function loadTop() {
 }
 
 // ===== Farm tab =====
-const FARM_MIN_INTERVAL_MS = 250; // matches server-side limit: 4 taps/sec
+const FARM_MIN_INTERVAL_MS = 110; // matches server-side limit
 let farmLastClientTap = 0;
 let farmLocked = false;
 let farmCountdownTimer = null;
@@ -377,26 +404,44 @@ function bumpCounter() {
   counterEl.classList.add('bump');
 }
 
-document.getElementById('farm-btn').addEventListener('click', async (ev) => {
+function attemptFarmTap(btn) {
   if (farmLocked) return;
 
   const now = Date.now();
-  if (now - farmLastClientTap < FARM_MIN_INTERVAL_MS) return; // client-side throttle, mirrors server limit
+  if (now - farmLastClientTap < FARM_MIN_INTERVAL_MS) return; // throttle, mirrors server limit
   farmLastClientTap = now;
 
-  spawnFarmParticle(ev.currentTarget);
+  spawnFarmParticle(btn);
   bumpCounter();
 
-  try {
-    const r = await api('/api/farm/tap', { method: 'POST' });
-    document.getElementById('farm-counter').textContent = `${r.taps_used} / 5000`;
-    document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
-    if (r.locked) applyFarmStatus({ locked: true, taps_used: r.taps_used, taps_limit: 5000, unlock_at: r.unlock_at });
-  } catch (e) {
-    if (e.unlock_at) applyFarmStatus({ locked: true, taps_used: 5000, taps_limit: 5000, unlock_at: e.unlock_at });
-    // "too fast" errors are silently ignored — the tap just doesn't register
-  }
-});
+  api('/api/farm/tap', { method: 'POST' })
+    .then((r) => {
+      document.getElementById('farm-counter').textContent = `${r.taps_used} / 5000`;
+      document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
+      if (r.locked) applyFarmStatus({ locked: true, taps_used: r.taps_used, taps_limit: 5000, unlock_at: r.unlock_at });
+    })
+    .catch((e) => {
+      if (e.unlock_at) applyFarmStatus({ locked: true, taps_used: 5000, taps_limit: 5000, unlock_at: e.unlock_at });
+      // "too fast" errors are silently ignored — the tap just doesn't register
+    });
+}
+
+const farmBtnEl = document.getElementById('farm-btn');
+
+// touchstart fires per finger and has no built-in delay, so several fingers
+// tapping in quick alternation register independently — much faster than
+// waiting on synthetic mouse "click" events one at a time.
+farmBtnEl.addEventListener(
+  'touchstart',
+  (ev) => {
+    ev.preventDefault(); // stop the follow-up synthetic click so taps aren't double-counted
+    for (let i = 0; i < ev.changedTouches.length; i++) attemptFarmTap(farmBtnEl);
+  },
+  { passive: false }
+);
+
+// keep click as a fallback for desktop/mouse testing (browsers without touch)
+farmBtnEl.addEventListener('click', () => attemptFarmTap(farmBtnEl));
 document.getElementById('btn-copy-link').addEventListener('click', async () => {
   try {
     const { link } = await api('/api/invite-link');
