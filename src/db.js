@@ -57,6 +57,8 @@ function upsertUser({ id, username, first_name, ref_by }) {
       farm_taps: 0,
       farm_last_tap: 0,
       farm_cooldown_until: 0,
+      shield_until: 0,
+      tap_boost_until: 0,
     };
     state.users[id] = u;
   }

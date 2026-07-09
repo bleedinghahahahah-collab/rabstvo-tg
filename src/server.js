@@ -27,6 +27,7 @@ const {
 } = require('./game');
 const { verifyInitData } = require('./auth');
 const { createBot } = require('./bot');
+const { listShopItems, getShopItem } = require('./shop');
 
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -63,6 +64,7 @@ function requireAuth(req, res, next) {
 function publicUser(u) {
   const owned = ownedCount(u.id);
   const now = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
   const hoursSinceDaily = (now - u.last_daily) / 3600;
   return {
     id: u.id,
@@ -78,6 +80,10 @@ function publicUser(u) {
     daily_available: hoursSinceDaily >= 20,
     next_rank: nextRankInfo(owned),
     ransom_cost: u.owner_id ? ransomCost(u) : null,
+    shield_active: !!(u.shield_until && nowMs < u.shield_until),
+    shield_until: u.shield_until || null,
+    tap_boost_active: !!(u.tap_boost_until && nowMs < u.tap_boost_until),
+    tap_boost_until: u.tap_boost_until || null,
   };
 }
 
@@ -89,7 +95,8 @@ app.get('/api/me', requireAuth, (req, res) => {
 
 // ---- GET /api/market: free players you could try to acquire ----
 app.get('/api/market', requireAuth, (req, res) => {
-  const rows = freeUsers(req.userId, 15);
+  const now = Date.now();
+  const rows = freeUsers(req.userId, 15).filter((u) => !(u.shield_until && now < u.shield_until));
   const list = rows.map((u) => ({
     id: u.id,
     username: u.username,
@@ -109,6 +116,9 @@ app.post('/api/acquire', requireAuth, (req, res) => {
   if (!target) return res.status(404).json({ error: 'Игрок не найден' });
   if (target.id === attacker.id) return res.status(400).json({ error: 'Себя не поработишь' });
   if (target.owner_id) return res.status(400).json({ error: 'Этот игрок уже кому-то принадлежит' });
+  if (target.shield_until && Date.now() < target.shield_until) {
+    return res.status(400).json({ error: 'Этот игрок сейчас под защитой от рабства' });
+  }
 
   const cost = acquisitionCost(target);
   if (attacker.balance < cost) return res.status(400).json({ error: 'Недостаточно монет', cost });
@@ -137,7 +147,8 @@ app.post('/api/acquire', requireAuth, (req, res) => {
 
 // ---- GET /api/market/stealable: people already owned by SOMEONE ELSE ----
 app.get('/api/market/stealable', requireAuth, (req, res) => {
-  const rows = stealableUsers(req.userId, 15);
+  const now = Date.now();
+  const rows = stealableUsers(req.userId, 15).filter((u) => !(u.shield_until && now < u.shield_until));
   const list = rows.map((u) => {
     const owner = getUser(u.owner_id);
     return {
@@ -160,6 +171,9 @@ app.post('/api/steal', requireAuth, (req, res) => {
   if (target.id === attacker.id) return res.status(400).json({ error: 'Себя не поработишь' });
   if (!target.owner_id) return res.status(400).json({ error: 'Этот человек свободен — используй «Захватить» на вкладке «Свободные»' });
   if (target.owner_id === attacker.id) return res.status(400).json({ error: 'Он уже твой' });
+  if (target.shield_until && Date.now() < target.shield_until) {
+    return res.status(400).json({ error: 'Этот игрок сейчас под защитой от рабства' });
+  }
 
   const cost = stealCost(target);
   if (attacker.balance < cost) return res.status(400).json({ error: 'Недостаточно монет', cost });
@@ -322,6 +336,32 @@ app.post('/api/farm/tap', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Не удалось' });
   }
   res.json(result);
+});
+
+// ---- GET /api/shop/items ----
+app.get('/api/shop/items', requireAuth, (req, res) => {
+  res.json(listShopItems());
+});
+
+// ---- POST /api/shop/invoice { item } — creates a Telegram Stars invoice
+// link. The Mini App opens this via Telegram.WebApp.openInvoice(); actual
+// fulfillment happens in bot.js once Telegram confirms the payment. ----
+app.post('/api/shop/invoice', requireAuth, async (req, res) => {
+  const item = getShopItem(req.body.item);
+  if (!item) return res.status(404).json({ error: 'Такого товара нет' });
+
+  try {
+    const link = await bot.api.createInvoiceLink({
+      title: item.title,
+      description: item.description,
+      payload: JSON.stringify({ userId: req.userId, item: req.body.item }),
+      currency: 'XTR',
+      prices: [{ label: item.title, amount: item.price }],
+    });
+    res.json({ link });
+  } catch (e) {
+    res.status(500).json({ error: 'Не удалось создать счёт' });
+  }
 });
 
 // ---- GET /api/invite-link ----

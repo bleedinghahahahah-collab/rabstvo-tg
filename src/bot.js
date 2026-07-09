@@ -1,6 +1,7 @@
 const { Bot, InlineKeyboard } = require('grammy');
 const { upsertUser, getUser, updateUser } = require('./db');
 const { logEvent, randomJob } = require('./game');
+const { getShopItem, applyPurchase } = require('./shop');
 
 function createBot({ token, webAppUrl }) {
   const bot = new Bot(token);
@@ -47,6 +48,42 @@ function createBot({ token, webAppUrl }) {
       ? 'Добро пожаловать в подполье. Ты пришёл по приглашению — на счету уже 1000 монет для старта.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.'
       : 'Добро пожаловать в подполье.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.';
     ctx.reply(welcomeText, { reply_markup: kb });
+  });
+
+  // ---- Telegram Stars payments ----
+  // Telegram asks the bot to confirm the order is still valid right before
+  // charging the user. We keep this simple: if the item exists, approve it.
+  bot.on('pre_checkout_query', async (ctx) => {
+    let payload;
+    try {
+      payload = JSON.parse(ctx.preCheckoutQuery.invoice_payload);
+    } catch {
+      payload = null;
+    }
+    const item = payload ? getShopItem(payload.item) : null;
+    if (item) {
+      await ctx.answerPreCheckoutQuery(true);
+    } else {
+      await ctx.answerPreCheckoutQuery(false, { error_message: 'Этот товар больше недоступен.' });
+    }
+  });
+
+  // This fires only after Telegram has actually confirmed the Stars payment
+  // succeeded — the one place purchases are actually granted.
+  bot.on('message:successful_payment', (ctx) => {
+    let payload;
+    try {
+      payload = JSON.parse(ctx.message.successful_payment.invoice_payload);
+    } catch {
+      payload = null;
+    }
+    if (!payload) return;
+
+    const applied = applyPurchase(ctx.from.id, payload.item);
+    const item = getShopItem(payload.item);
+    if (applied && item) {
+      ctx.reply(`Оплата прошла! «${item.title}» уже применено — загляни в игру.`);
+    }
   });
 
   bot.command('help', (ctx) => {

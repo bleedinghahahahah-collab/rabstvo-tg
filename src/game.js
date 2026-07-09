@@ -215,7 +215,9 @@ function tryFarmTap(userId) {
   }
 
   const newTaps = (u.farm_taps || 0) + 1;
-  const newBalance = Math.round((u.balance + FARM_REWARD) * 10) / 10;
+  const boosted = u.tap_boost_until && now < u.tap_boost_until;
+  const reward = boosted ? FARM_REWARD * 2 : FARM_REWARD;
+  const newBalance = Math.round((u.balance + reward) * 10) / 10;
   const patch = { balance: newBalance, farm_taps: newTaps, farm_last_tap: now };
 
   if (newTaps >= FARM_TAP_LIMIT) {
@@ -226,7 +228,8 @@ function tryFarmTap(userId) {
 
   return {
     ok: true,
-    reward: FARM_REWARD,
+    reward,
+    boosted,
     balance: newBalance,
     taps_used: newTaps,
     taps_remaining: Math.max(0, FARM_TAP_LIMIT - newTaps),

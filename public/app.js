@@ -90,7 +90,7 @@ function fmtDec(n) {
 // that's what broke layout, especially visible on desktop viewports.
 // Now panels are normal flow by default, and only become position:absolute
 // (via the .transitioning class) for the ~280ms the animation runs.
-const TAB_ORDER = ['profile', 'market', 'people', 'farm', 'top', 'invite'];
+const TAB_ORDER = ['profile', 'market', 'people', 'farm', 'shop', 'top', 'invite'];
 const TRANSITION_MS = 300;
 let currentTab = 'profile';
 let tabTransitionTimer = null;
@@ -158,6 +158,7 @@ function loadPanel(name) {
   if (name === 'people') loadPeople();
   if (name === 'top') loadTop();
   if (name === 'farm') loadFarmStatus();
+  if (name === 'shop') loadShop();
 }
 
 // ===== Header (profile summary) =====
@@ -205,6 +206,24 @@ async function loadMe() {
   dailyBtn.classList.toggle('collected', !me.daily_available);
   dailyBtn.disabled = !me.daily_available;
   document.getElementById('daily-sub').textContent = me.daily_available ? 'доступно' : 'уже забрано';
+
+  // Active shop effects: shield / tap boost
+  const badgesWrap = document.getElementById('status-badges');
+  badgesWrap.innerHTML = '';
+  if (me.shield_active) {
+    badgesWrap.innerHTML += `
+      <div class="status-badge">
+        <span class="badge-title">Защита от рабства активна</span>
+        <span class="badge-time">до ${new Date(me.shield_until).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+      </div>`;
+  }
+  if (me.tap_boost_active) {
+    badgesWrap.innerHTML += `
+      <div class="status-badge">
+        <span class="badge-title">Бустер тапа x2 активен</span>
+        <span class="badge-time">до ${new Date(me.tap_boost_until).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+      </div>`;
+  }
 
   // Ransom section: only exists on screen at all while actually enslaved
   document.getElementById('ransom-section').style.display = me.is_owned_by ? 'block' : 'none';
@@ -503,10 +522,10 @@ function updateFarmLockCountdown(unlockAt) {
   lockHint.textContent = `Лимит тапов исчерпан. Обновится через ${pad(h)}:${pad(m)}:${pad(s)}. Придёт уведомление от бота.`;
 }
 
-function spawnFarmParticle(btn) {
+function spawnFarmParticle(btn, text = '+1') {
   const particle = document.createElement('div');
   particle.className = 'farm-particle';
-  particle.textContent = '+1';
+  particle.textContent = text;
   const angle = Math.random() * Math.PI * 2;
   const distance = 60 + Math.random() * 40;
   particle.style.setProperty('--fx', `${Math.cos(angle) * distance}px`);
@@ -537,6 +556,7 @@ function attemptFarmTap(btn) {
     .then((r) => {
       document.getElementById('farm-counter').textContent = `${r.taps_used} / 5000`;
       document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
+      if (r.boosted) spawnFarmParticle(btn, 'x2');
       if (r.locked) applyFarmStatus({ locked: true, taps_used: r.taps_used, taps_limit: 5000, unlock_at: r.unlock_at });
     })
     .catch((e) => {
@@ -561,6 +581,62 @@ farmBtnEl.addEventListener(
 
 // keep click as a fallback for desktop/mouse testing (browsers without touch)
 farmBtnEl.addEventListener('click', () => attemptFarmTap(farmBtnEl));
+
+// ===== Shop tab: buy with Telegram Stars =====
+async function loadShop() {
+  const list = document.getElementById('shop-list');
+  list.innerHTML = '<div class="empty-state">Загрузка…</div>';
+  const items = await api('/api/shop/items');
+  list.innerHTML = '';
+  items.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'ledger-row';
+    row.style.flexWrap = 'wrap';
+    row.innerHTML = `
+      <div style="min-width:0;flex:1;">
+        <div class="row-name">${item.title}</div>
+        <div class="row-meta">${item.description}</div>
+      </div>
+      <div class="row-value">${item.price} звёзд</div>
+      <div class="row-actions">
+        <button class="mini-btn collect" data-key="${item.key}">Купить</button>
+      </div>
+    `;
+    row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
+      ev.target.disabled = true;
+      try {
+        const { link } = await api('/api/shop/invoice', {
+          method: 'POST',
+          body: JSON.stringify({ item: item.key }),
+        });
+        if (!tg?.openInvoice) {
+          toast('Открой это в Telegram, чтобы оплатить звёздами');
+          ev.target.disabled = false;
+          return;
+        }
+        tg.openInvoice(link, (status) => {
+          ev.target.disabled = false;
+          if (status === 'paid') {
+            toast('Оплачено! Обновляю...');
+            setTimeout(() => {
+              loadMe();
+              loadShop();
+            }, 1200); // small delay so the bot's successful_payment handler has time to apply it
+          } else if (status === 'cancelled') {
+            toast('Оплата отменена');
+          } else if (status === 'failed') {
+            toast('Платёж не прошёл');
+          }
+        });
+      } catch (e) {
+        toast(e.message);
+        ev.target.disabled = false;
+      }
+    });
+    list.appendChild(row);
+  });
+}
+
 document.getElementById('btn-copy-link').addEventListener('click', async () => {
   try {
     const { link } = await api('/api/invite-link');
