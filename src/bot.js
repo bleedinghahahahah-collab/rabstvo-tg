@@ -21,16 +21,19 @@ function createBot({ token, webAppUrl }) {
       ref_by: refBy,
     });
 
-    // First-time join via referral: give both sides a starter bonus, and the
-    // invited player starts out already "in service to" the inviter — ties
-    // the invite system directly into the core ownership mechanic.
+    // First-time join via referral: the invited player starts with a flat
+    // 500 (instead of the usual 250 for organic joins) and starts out
+    // already "in service to" the inviter — ties the invite system directly
+    // into the core ownership mechanic. The inviter gets a flat +150.
+    let joinedViaReferral = false;
     if (!alreadyExists && refBy) {
       const inviter = getUser(refBy);
       if (inviter) {
+        joinedViaReferral = true;
         const job = randomJob();
-        updateUser(refBy, { balance: inviter.balance + 50 });
+        updateUser(refBy, { balance: inviter.balance + 150 });
         updateUser(user.id, {
-          balance: user.balance + 150,
+          balance: 500,
           owner_id: refBy,
           job: job.key,
           income_last_claim: Math.floor(Date.now() / 1000),
@@ -40,10 +43,10 @@ function createBot({ token, webAppUrl }) {
     }
 
     const kb = new InlineKeyboard().webApp('Открыть игру', webAppUrl);
-    ctx.reply(
-      'Добро пожаловать в подполье.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.',
-      { reply_markup: kb }
-    );
+    const welcomeText = joinedViaReferral
+      ? 'Добро пожаловать в подполье. Ты пришёл по приглашению — на счету уже 500 монет для старта.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.'
+      : 'Добро пожаловать в подполье.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.';
+    ctx.reply(welcomeText, { reply_markup: kb });
   });
 
   bot.command('help', (ctx) => {

@@ -43,7 +43,7 @@ function upsertUser({ id, username, first_name, ref_by }) {
       id,
       username: username || null,
       first_name: first_name || null,
-      balance: 500,
+      balance: 250,
       protection: 1,
       income_per_hour: 35,
       owner_id: null,
