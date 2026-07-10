@@ -350,7 +350,7 @@ async function loadFreeMarket(silent = false) {
           method: 'POST',
           body: JSON.stringify({ targetId: p.id }),
         });
-        toast('Захвачен!');
+        toast('Успешно!');
         loadMarket(true);
         loadMe();
       } catch (e) {
@@ -394,7 +394,7 @@ async function loadStealMarket(silent = false) {
           method: 'POST',
           body: JSON.stringify({ targetId: p.id }),
         });
-        toast('Украдено!');
+        toast('Успешно!');
         loadMarket(true);
         loadMe();
       } catch (e) {
