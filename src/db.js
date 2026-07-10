@@ -110,6 +110,20 @@ function topByBalance(limit = 20) {
     .slice(0, limit);
 }
 
+// ---- Top players by number of people they own (needs an ownedCount fn
+// passed in from game.js to avoid a circular require between db.js/game.js) ----
+function topByOwned(ownedCountFn, limit = 20) {
+  return allUsers()
+    .sort((a, b) => ownedCountFn(b.id) - ownedCountFn(a.id))
+    .slice(0, limit);
+}
+
+// ---- Where does this user rank among EVERYONE (not just the top 20)? ----
+function rankPosition(userId, compareFn) {
+  const sorted = allUsers().slice().sort(compareFn);
+  return sorted.findIndex((u) => u.id === userId) + 1;
+}
+
 function logEvent(userId, type, payload) {
   state.events.push({
     id: state.nextEventId++,
@@ -130,5 +144,7 @@ module.exports = {
   freeUsers,
   stealableUsers,
   topByBalance,
+  topByOwned,
+  rankPosition,
   logEvent,
 };

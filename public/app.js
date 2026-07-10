@@ -171,7 +171,9 @@ async function loadMe() {
   document.getElementById('hdr-balance').textContent = fmtDec(me.balance);
   document.getElementById('hdr-income').textContent = fmt(me.income_per_hour) + '/ч';
   document.getElementById('hdr-owned').textContent = fmt(me.owned_count);
-  document.getElementById('hdr-status').textContent = me.is_owned_by ? 'В услужении' : 'Свободен';
+  document.getElementById('hdr-status').textContent = me.is_owned_by
+    ? `У ${me.owner_name || 'неизвестного'}`
+    : 'Свободен';
 
   document.getElementById('seal-initials').textContent = initials(me.username || me.first_name);
   // Telegram gives us our OWN photo directly in initData — no round trip needed
@@ -206,6 +208,23 @@ async function loadMe() {
   dailyBtn.classList.toggle('collected', !me.daily_available);
   dailyBtn.disabled = !me.daily_available;
   document.getElementById('daily-sub').textContent = me.daily_available ? 'доступно' : 'уже забрано';
+
+  const dailyTimerHint = document.getElementById('daily-timer-hint');
+  if (!me.daily_available) {
+    const refreshDate = new Date(me.daily_available_at);
+    const timeStr = refreshDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const isToday = refreshDate.toDateString() === new Date().toDateString();
+    dailyTimerHint.textContent = isToday
+      ? `Обновится сегодня в ${timeStr}`
+      : `Обновится завтра в ${timeStr}`;
+    dailyTimerHint.style.display = 'block';
+  } else {
+    dailyTimerHint.style.display = 'none';
+  }
+
+  // Your position in both leaderboards
+  document.getElementById('my-rank-balance').textContent = '#' + me.rank_by_balance;
+  document.getElementById('my-rank-owned').textContent = '#' + me.rank_by_owned;
 
   // Active shop effects: shield / tap boost
   const badgesWrap = document.getElementById('status-badges');
@@ -296,14 +315,14 @@ document.querySelectorAll('#market-segmented .segmented-btn').forEach((btn) => {
   });
 });
 
-async function loadMarket() {
-  if (marketMode === 'free') return loadFreeMarket();
-  return loadStealMarket();
+async function loadMarket(silent = false) {
+  if (marketMode === 'free') return loadFreeMarket(silent);
+  return loadStealMarket(silent);
 }
 
-async function loadFreeMarket() {
+async function loadFreeMarket(silent = false) {
   const list = document.getElementById('market-list');
-  list.innerHTML = '<div class="empty-state">Ищем кандидатов…</div>';
+  if (!silent) list.innerHTML = '<div class="empty-state">Ищем кандидатов…</div>';
   const rows = await api('/api/market');
   if (!rows.length) {
     list.innerHTML = '<div class="empty-state">Сейчас все либо уже заняты, либо это ты сам. Загляни позже.</div>';
@@ -332,7 +351,7 @@ async function loadFreeMarket() {
           body: JSON.stringify({ targetId: p.id }),
         });
         toast('Захвачен!');
-        loadMarket();
+        loadMarket(true);
         loadMe();
       } catch (e) {
         toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
@@ -343,9 +362,9 @@ async function loadFreeMarket() {
   });
 }
 
-async function loadStealMarket() {
+async function loadStealMarket(silent = false) {
   const list = document.getElementById('market-list');
-  list.innerHTML = '<div class="empty-state">Ищем чужих людей…</div>';
+  if (!silent) list.innerHTML = '<div class="empty-state">Ищем чужих людей…</div>';
   const rows = await api('/api/market/stealable');
   if (!rows.length) {
     list.innerHTML = '<div class="empty-state">Пока красть не у кого — у всех либо нет людей, либо это твои же.</div>';
@@ -376,7 +395,7 @@ async function loadStealMarket() {
           body: JSON.stringify({ targetId: p.id }),
         });
         toast('Украдено!');
-        loadMarket();
+        loadMarket(true);
         loadMe();
       } catch (e) {
         toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
@@ -388,12 +407,18 @@ async function loadStealMarket() {
 }
 
 // ===== My people tab =====
-async function loadPeople() {
+async function loadPeople(silent = false) {
   const list = document.getElementById('people-list');
-  list.innerHTML = '<div class="empty-state">Загрузка…</div>';
+  // The "Загрузка…" placeholder briefly collapses the list's height while the
+  // request is in flight, which is what caused the page to scroll back to
+  // the top after tapping a button near the bottom. Skipping it on refresh
+  // (silent=true) keeps the existing rows in place until the new ones are
+  // ready, so the scroll position never jumps.
+  if (!silent) list.innerHTML = '<div class="empty-state">Загрузка…</div>';
   const rows = await api('/api/my-people');
   if (!rows.length) {
     list.innerHTML = '<div class="empty-state">Пока никого нет — попробуй «Рынок».</div>';
+    document.getElementById('collect-all-sub').textContent = '';
     return;
   }
   list.innerHTML = '';
@@ -420,7 +445,7 @@ async function loadPeople() {
         const r = await api(`/api/collect/${p.id}`, { method: 'POST' });
         ev.target.classList.add('just-collected');
         toast(`Собрано: +${fmtDec(r.gained)}`);
-        loadPeople();
+        loadPeople(true);
         loadMe();
       } catch (e) {
         toast(e.message);
@@ -433,7 +458,7 @@ async function loadPeople() {
       try {
         await api(`/api/free/${p.id}`, { method: 'POST' });
         toast('Отпущен на свободу');
-        loadPeople();
+        loadPeople(true);
         loadMe();
       } catch (e) {
         toast(e.message);
@@ -442,18 +467,53 @@ async function loadPeople() {
     });
     list.appendChild(row);
   });
+
+  const totalPending = rows.reduce((sum, p) => sum + p.pending_income, 0);
+  document.getElementById('collect-all-sub').textContent = totalPending > 0 ? `+${fmtDec(totalPending)} суммарно` : 'нечего собирать';
 }
 
+document.getElementById('btn-collect-all').addEventListener('click', async (ev) => {
+  ev.target.disabled = true;
+  try {
+    const r = await api('/api/collect-all', { method: 'POST' });
+    if (r.gained > 0) {
+      toast(`Собрано со всех: +${fmtDec(r.gained)}`);
+    } else {
+      toast('Пока нечего собирать');
+    }
+    loadPeople(true);
+    loadMe();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    ev.target.disabled = false;
+  }
+});
+
 // ===== Leaderboard tab =====
-async function loadTop() {
+let topMode = 'balance';
+
+document.querySelectorAll('#top-segmented .segmented-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.mode === topMode) return;
+    document.querySelectorAll('#top-segmented .segmented-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    topMode = btn.dataset.mode;
+    loadTop();
+  });
+});
+
+async function loadTop(silent = false) {
   const list = document.getElementById('top-list');
-  list.innerHTML = '<div class="empty-state">Считаем состояния…</div>';
-  const rows = await api('/api/leaderboard');
+  if (!silent) list.innerHTML = '<div class="empty-state">Считаем состояния…</div>';
+  const rows = await api(`/api/leaderboard?by=${topMode}`);
   list.innerHTML = '';
   rows.forEach((p) => {
     const name = p.username ? '@' + p.username : p.first_name || 'Без имени';
     const row = document.createElement('div');
     row.className = 'ledger-row';
+    const valueHtml =
+      topMode === 'owned' ? `${fmt(p.owned_count)} чел.` : `${fmt(p.balance)}`;
     row.innerHTML = `
       <div class="rank-badge">#${p.rank}</div>
       <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
@@ -462,7 +522,7 @@ async function loadTop() {
         <div class="row-meta">${p.rank_title} · ${p.owned_count} чел. в подчинении</div>
       </div>
       <div class="row-leader"></div>
-      <div class="row-value">${fmt(p.balance)}</div>
+      <div class="row-value">${valueHtml}</div>
     `;
     list.appendChild(row);
   });

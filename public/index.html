@@ -97,6 +97,18 @@
         <span>Забрать дневной взнос</span>
         <span class="btn-sub" id="daily-sub">доступно</span>
       </button>
+      <div class="hint-box" id="daily-timer-hint" style="display:none"></div>
+
+      <div class="invite-rewards" style="margin-top:14px;">
+        <div class="invite-reward-card">
+          <span class="invite-reward-figure" id="my-rank-balance">—</span>
+          <span class="invite-reward-label">место по монетам</span>
+        </div>
+        <div class="invite-reward-card">
+          <span class="invite-reward-figure" id="my-rank-owned">—</span>
+          <span class="invite-reward-label">место по рабам</span>
+        </div>
+      </div>
 
       <div id="ransom-section" style="display:none">
         <div class="hint-box" id="ransom-hint">
@@ -126,6 +138,10 @@
         <span class="eyebrow">Твои активы</span>
         <h2>Мои люди</h2>
       </div>
+      <button class="action-btn glow-btn green" id="btn-collect-all">
+        <span>Собрать весь доход</span>
+        <span class="btn-sub" id="collect-all-sub"></span>
+      </button>
       <div class="list" id="people-list"><div class="empty-state">Пока никого нет.</div></div>
     </section>
 
@@ -164,6 +180,10 @@
       <div class="section-title">
         <span class="eyebrow">Иерархия подполья</span>
         <h2>Топ игроков</h2>
+      </div>
+      <div class="segmented" id="top-segmented">
+        <button class="segmented-btn active" data-mode="balance">По монетам</button>
+        <button class="segmented-btn" data-mode="owned">По рабам</button>
       </div>
       <div class="list" id="top-list"><div class="empty-state">Считаем состояния…</div></div>
     </section>

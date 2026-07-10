@@ -3,7 +3,7 @@ const path = require('path');
 const express = require('express');
 const { webhookCallback } = require('grammy');
 
-const { getUser, upsertUser, updateUser, ownedBy, freeUsers, stealableUsers, topByBalance } = require('./db');
+const { getUser, upsertUser, updateUser, ownedBy, freeUsers, stealableUsers, topByBalance, topByOwned, rankPosition } = require('./db');
 const {
   accrue,
   effectiveIncome,
@@ -65,6 +65,7 @@ function publicUser(u) {
   const now = Math.floor(Date.now() / 1000);
   const nowMs = Date.now();
   const hoursSinceDaily = (now - u.last_daily) / 3600;
+  const owner = u.owner_id ? getUser(u.owner_id) : null;
   return {
     id: u.id,
     username: u.username,
@@ -74,15 +75,19 @@ function publicUser(u) {
     income_per_hour: effectiveIncome(u),
     owned_count: owned,
     is_owned_by: u.owner_id,
+    owner_name: owner ? displayName(owner) : null,
     rank_title: rankFor(owned),
     daily_streak: u.daily_streak,
     daily_available: hoursSinceDaily >= 20,
+    daily_available_at: (u.last_daily + 20 * 3600) * 1000,
     next_rank: nextRankInfo(owned),
     ransom_cost: u.owner_id ? ransomCost(u) : null,
     shield_active: !!(u.shield_until && nowMs < u.shield_until),
     shield_until: u.shield_until || null,
     tap_boost_active: !!(u.tap_boost_until && nowMs < u.tap_boost_until),
     tap_boost_until: u.tap_boost_until || null,
+    rank_by_balance: rankPosition(u.id, (a, b) => b.balance - a.balance),
+    rank_by_owned: rankPosition(u.id, (a, b) => ownedCount(b.id) - ownedCount(a.id)),
   };
 }
 
@@ -233,6 +238,23 @@ app.post('/api/collect/:id', requireAuth, (req, res) => {
   res.json({ ok: true, gained, balance: getUser(req.userId).balance });
 });
 
+// ---- POST /api/collect-all — collect income from every owned person at once ----
+app.post('/api/collect-all', requireAuth, (req, res) => {
+  const people = ownedBy(req.userId);
+  let total = 0;
+  for (const person of people) {
+    total += collectFromPerson(person);
+  }
+  total = Math.round(total * 10) / 10;
+
+  if (total > 0) {
+    const me = getUser(req.userId);
+    updateUser(req.userId, { balance: Math.round((me.balance + total) * 10) / 10 });
+  }
+
+  res.json({ ok: true, gained: total, balance: getUser(req.userId).balance });
+});
+
 // ---- POST /api/free/:id — release someone you own, no charge ----
 app.post('/api/free/:id', requireAuth, (req, res) => {
   const person = getUser(Number(req.params.id));
@@ -286,9 +308,10 @@ app.get('/api/avatar/:id', requireAuth, async (req, res) => {
 
 // ---- GET /api/leaderboard ----
 app.get('/api/leaderboard', requireAuth, (req, res) => {
-  const byWealth = topByBalance(20);
+  const by = req.query.by === 'owned' ? 'owned' : 'balance';
+  const top = by === 'owned' ? topByOwned(ownedCount, 20) : topByBalance(20);
   res.json(
-    byWealth.map((u, i) => ({
+    top.map((u, i) => ({
       rank: i + 1,
       id: u.id,
       username: u.username,
