@@ -169,7 +169,7 @@
       </div>
 
       <div class="hint-box" id="farm-lock-hint" style="display:none"></div>
-      <p class="invite-copy" style="text-align:center;margin-top:14px;">
+      <p class="invite-copy" style="text-align:center;margin-top:14px;" id="farm-description">
         Каждый тап — 1 монета. После 5000 тапов — перерыв на 3 часа.
       </p>
     </section>
@@ -180,27 +180,43 @@
         <h2>Магазин</h2>
       </div>
 
-      <div class="shop-bar">
-        <div class="shop-bar-title">Монеты</div>
-        <div class="list" id="shop-list-coins"><div class="empty-state">Загрузка…</div></div>
+      <div id="shop-menu">
+        <button class="shop-menu-btn" data-cat="coins">
+          <span class="shop-menu-title">Монеты</span>
+          <span class="shop-menu-sub">за звёзды</span>
+        </button>
+        <button class="shop-menu-btn" data-cat="services">
+          <span class="shop-menu-title">Услуги</span>
+          <span class="shop-menu-sub">за звёзды</span>
+        </button>
+        <button class="shop-menu-btn" data-cat="farm">
+          <span class="shop-menu-title">Фарм</span>
+          <span class="shop-menu-sub">бесплатно · за монеты</span>
+        </button>
       </div>
 
-      <div class="shop-bar">
-        <div class="shop-bar-title">Услуги</div>
-        <div class="list" id="shop-list-services"><div class="empty-state">Загрузка…</div></div>
-      </div>
+      <div id="shop-detail" style="display:none;">
+        <button class="action-btn" id="btn-shop-back">← Назад</button>
 
-      <div class="shop-bar">
-        <div class="shop-bar-title">Фарм</div>
-        <div class="list" id="shop-list-farm">
-          <div class="ledger-row" style="flex-wrap:wrap;">
-            <div style="min-width:0;flex:1;">
-              <div class="row-name">Улучшение тапа</div>
-              <div class="row-meta" id="tap-upgrade-meta">Уровень 0 · +0.0 к тапу</div>
-            </div>
-            <div class="row-value" id="tap-upgrade-cost">—</div>
-            <div class="row-actions">
-              <button class="mini-btn buy" id="btn-upgrade-tap">Улучшить</button>
+        <div class="shop-bar" id="shop-bar-coins" style="display:none;">
+          <div class="list" id="shop-list-coins"><div class="empty-state">Загрузка…</div></div>
+        </div>
+
+        <div class="shop-bar" id="shop-bar-services" style="display:none;">
+          <div class="list" id="shop-list-services"><div class="empty-state">Загрузка…</div></div>
+        </div>
+
+        <div class="shop-bar" id="shop-bar-farm" style="display:none;">
+          <div class="list" id="shop-list-farm">
+            <div class="ledger-row" style="flex-wrap:wrap;">
+              <div style="min-width:0;flex:1;">
+                <div class="row-name">Улучшение тапа</div>
+                <div class="row-meta" id="tap-upgrade-meta">Уровень 0 · +0.0 к тапу</div>
+              </div>
+              <div class="row-value" id="tap-upgrade-cost">—</div>
+              <div class="row-actions">
+                <button class="mini-btn buy" id="btn-upgrade-tap">Улучшить</button>
+              </div>
             </div>
           </div>
         </div>

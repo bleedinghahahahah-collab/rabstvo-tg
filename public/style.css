@@ -23,20 +23,20 @@
 .shimmer-text {
   background: linear-gradient(
     100deg,
-    var(--paper) 30%,
-    var(--gray-bright) 42%,
+    #8a8a8a 25%,
+    #d8d8d8 40%,
     #ffffff 50%,
-    var(--gray-bright) 58%,
-    var(--paper) 70%
+    #d8d8d8 60%,
+    #8a8a8a 75%
   );
-  background-size: 250% auto;
+  background-size: 300% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: shimmerText 3.2s linear infinite;
+  animation: shimmerText 2.2s linear infinite;
 }
 @keyframes shimmerText {
-  0% { background-position: 200% center; }
+  0% { background-position: 250% center; }
   100% { background-position: -50% center; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -263,17 +263,17 @@ html, body {
 .section-title h2 {
   background: linear-gradient(
     100deg,
-    var(--paper) 30%,
-    var(--gray-bright) 42%,
+    #8a8a8a 25%,
+    #d8d8d8 40%,
     #ffffff 50%,
-    var(--gray-bright) 58%,
-    var(--paper) 70%
+    #d8d8d8 60%,
+    #8a8a8a 75%
   );
-  background-size: 250% auto;
+  background-size: 300% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: shimmerText 3.2s linear infinite;
+  animation: shimmerText 2.2s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .ledger-name,
@@ -409,6 +409,28 @@ main#panels {
 
 /* ===== Segmented toggle (Market: Свободные / Украсть) ===== */
 /* ===== Shop bars (Монеты / Услуги / Фарм) ===== */
+/* ===== Shop menu (Монеты / Услуги / Фарм stacked buttons) ===== */
+#shop-menu { display: flex; flex-direction: column; gap: 10px; }
+.shop-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 1px solid var(--gray-accent);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background:
+    linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%),
+    var(--ink-raised);
+  background-size: 300% 300%, 100% 100%;
+  animation: glowShimmer 2.8s ease-in-out infinite;
+  box-shadow: 0 3px 0 #000, 0 6px 10px rgba(0,0,0,0.4);
+  transition: transform .12s cubic-bezier(.4,0,.2,1), box-shadow .12s cubic-bezier(.4,0,.2,1);
+}
+.shop-menu-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #000, 0 1px 3px rgba(0,0,0,0.3); }
+.shop-menu-title { font-size: 16px; font-weight: 700; color: var(--paper); }
+.shop-menu-sub { font-size: 11.5px; color: var(--gray-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
 .shop-bar {
   border: 1px solid var(--gray-line);
   border-radius: 12px;

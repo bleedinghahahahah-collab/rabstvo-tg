@@ -546,12 +546,18 @@ async function loadTop(silent = false) {
 const FARM_MIN_INTERVAL_MS = 60; // matches server-side limit
 let farmLastClientTap = 0;
 let farmLocked = false;
+let currentTapValue = 1; // reflects base tap value including any permanent upgrades
 let farmCountdownTimer = null;
 
 async function loadFarmStatus() {
   try {
     const status = await api('/api/farm/status');
     applyFarmStatus(status);
+    if (typeof status.tap_value === 'number') {
+      currentTapValue = status.tap_value;
+      document.getElementById('farm-description').textContent =
+        `Каждый тап — ${fmtDec(currentTapValue)} монет${currentTapValue === 1 ? 'а' : ''}. После 5000 тапов — перерыв на 3 часа.`;
+    }
   } catch (e) {
     toast(e.message);
   }
@@ -622,7 +628,7 @@ function attemptFarmTap(btn) {
   if (now - farmLastClientTap < FARM_MIN_INTERVAL_MS) return; // throttle, mirrors server limit
   farmLastClientTap = now;
 
-  spawnFarmParticle(btn);
+  spawnFarmParticle(btn, `+${fmtDec(currentTapValue)}`);
   bumpCounter();
   tg?.HapticFeedback?.impactOccurred?.('light');
 
@@ -630,6 +636,7 @@ function attemptFarmTap(btn) {
     .then((r) => {
       document.getElementById('farm-counter').textContent = `${r.taps_used} / 5000`;
       document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
+      if (r.reward) currentTapValue = r.boosted ? r.reward / 2 : r.reward; // keep the tracked base value in sync
       if (r.boosted) spawnFarmParticle(btn, 'x2');
       if (r.locked) applyFarmStatus({ locked: true, taps_used: r.taps_used, taps_limit: 5000, unlock_at: r.unlock_at });
     })
@@ -689,7 +696,6 @@ function renderShopRow(item, listEl) {
           toast('Оплачено! Обновляю...');
           setTimeout(() => {
             loadMe();
-            loadShop();
           }, 1200); // small delay so the bot's successful_payment handler has time to apply it
         } else if (status === 'cancelled') {
           toast('Оплата отменена');
@@ -705,24 +711,48 @@ function renderShopRow(item, listEl) {
   listEl.appendChild(row);
 }
 
-async function loadShop() {
-  const coinsList = document.getElementById('shop-list-coins');
-  const servicesList = document.getElementById('shop-list-services');
-  coinsList.innerHTML = '<div class="empty-state">Загрузка…</div>';
-  servicesList.innerHTML = '<div class="empty-state">Загрузка…</div>';
+let shopItemsCache = null;
 
-  const items = await api('/api/shop/items');
-  coinsList.innerHTML = '';
-  servicesList.innerHTML = '';
-  items.forEach((item) => {
-    renderShopRow(item, item.category === 'services' ? servicesList : coinsList);
-  });
+function loadShop() {
+  // always land back on the menu when opening the Shop tab
+  document.getElementById('shop-menu').style.display = 'flex';
+  document.getElementById('shop-detail').style.display = 'none';
+  document.querySelectorAll('#shop-detail .shop-bar').forEach((bar) => (bar.style.display = 'none'));
+}
 
-  await loadTapUpgradeStatus();
+document.querySelectorAll('.shop-menu-btn').forEach((btn) => {
+  btn.addEventListener('click', () => openShopCategory(btn.dataset.cat));
+});
+
+document.getElementById('btn-shop-back').addEventListener('click', () => {
+  document.getElementById('shop-menu').style.display = 'flex';
+  document.getElementById('shop-detail').style.display = 'none';
+});
+
+async function openShopCategory(cat) {
+  document.getElementById('shop-menu').style.display = 'none';
+  document.getElementById('shop-detail').style.display = 'block';
+  document.querySelectorAll('#shop-detail .shop-bar').forEach((bar) => (bar.style.display = 'none'));
+  document.getElementById(`shop-bar-${cat}`).style.display = 'block';
+
+  if (cat === 'farm') {
+    await loadTapUpgradeStatus();
+    return;
+  }
+
+  const listEl = document.getElementById(`shop-list-${cat}`);
+  listEl.innerHTML = '<div class="empty-state">Загрузка…</div>';
+
+  if (!shopItemsCache) shopItemsCache = await api('/api/shop/items');
+  listEl.innerHTML = '';
+  shopItemsCache
+    .filter((item) => (item.category || 'coins') === cat)
+    .forEach((item) => renderShopRow(item, listEl));
 }
 
 async function loadTapUpgradeStatus() {
   const status = await api('/api/farm/status');
+  currentTapValue = status.tap_value;
   document.getElementById('tap-upgrade-meta').textContent =
     `Уровень ${status.tap_upgrade_level} · сейчас +${fmtDec(status.tap_value)} за тап`;
   document.getElementById('tap-upgrade-cost').textContent = fmt(status.tap_upgrade_cost);
