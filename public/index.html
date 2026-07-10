@@ -41,6 +41,11 @@
 
 <div id="app">
 
+  <div class="online-bar">
+    <span class="online-dot"></span>
+    <span id="online-count">—</span> <span class="online-label">играют сейчас</span>
+  </div>
+
   <!-- ===== Ledger header: always visible, shows the player's own standing ===== -->
   <header class="ledger-card">
     <div class="seal" id="seal-wrap"><span id="seal-initials">?</span><img id="seal-avatar" alt="" /></div>
@@ -63,10 +68,6 @@
       <span class="substat-label">Рабов</span>
       <span class="substat-value" id="hdr-owned">0</span>
     </div>
-    <div class="substat" id="hdr-status-wrap">
-      <span class="substat-label">Статус</span>
-      <span class="substat-value" id="hdr-status">Свободен</span>
-    </div>
   </div>
 
   <!-- ===== Tab panels ===== -->
@@ -76,6 +77,11 @@
       <div class="section-title">
         <span class="eyebrow">Твоё дело</span>
         <h2>Профиль</h2>
+      </div>
+
+      <div class="profile-status" id="profile-status">
+        <span class="profile-status-dot"></span>
+        <span id="profile-status-text">Свободен</span>
       </div>
 
       <div class="rank-progress-card">

@@ -171,9 +171,11 @@ async function loadMe() {
   document.getElementById('hdr-balance').textContent = fmtDec(me.balance);
   document.getElementById('hdr-income').textContent = fmt(me.income_per_hour) + '/ч';
   document.getElementById('hdr-owned').textContent = fmt(me.owned_count);
-  document.getElementById('hdr-status').textContent = me.is_owned_by
-    ? `У ${me.owner_name || 'неизвестного'}`
-    : 'Свободен';
+
+  const statusEl = document.getElementById('profile-status');
+  const statusText = document.getElementById('profile-status-text');
+  statusEl.classList.toggle('enslaved', !!me.is_owned_by);
+  statusText.textContent = me.is_owned_by ? `В услужении у ${me.owner_name || 'неизвестного'}` : 'Свободен';
 
   document.getElementById('seal-initials').textContent = initials(me.username || me.first_name);
   // Telegram gives us our OWN photo directly in initData — no round trip needed
@@ -277,6 +279,18 @@ document.getElementById('big-alert-close').addEventListener('click', () => {
 setInterval(() => {
   loadMe().catch(() => {});
 }, 8000);
+
+// ===== Online-now counter =====
+async function loadOnlineCount() {
+  try {
+    const { count } = await api('/api/online');
+    document.getElementById('online-count').textContent = fmt(count);
+  } catch {
+    /* silent — this is just a nice-to-have indicator */
+  }
+}
+loadOnlineCount();
+setInterval(loadOnlineCount, 8000);
 
 // ===== Profile tab actions =====
 document.getElementById('btn-daily').addEventListener('click', async () => {

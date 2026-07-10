@@ -60,6 +60,7 @@ function upsertUser({ id, username, first_name, ref_by }) {
       shield_until: 0,
       tap_boost_until: 0,
       times_ransomed: 0,
+      last_seen: 0,
     };
     state.users[id] = u;
   }
@@ -77,6 +78,14 @@ function updateUser(id, patch) {
 
 function allUsers() {
   return Object.values(state.users);
+}
+
+// ---- How many players have been active in the last `windowMs` — powers the
+// "X играют сейчас" indicator. Matches the frontend's 8s status-poll interval
+// with some slack so it doesn't flicker between polls. ----
+function onlineCount(windowMs = 20000) {
+  const now = Date.now();
+  return allUsers().filter((u) => u.last_seen && now - u.last_seen < windowMs).length;
 }
 
 function ownedBy(ownerId) {
@@ -146,5 +155,6 @@ module.exports = {
   topByBalance,
   topByOwned,
   rankPosition,
+  onlineCount,
   logEvent,
 };

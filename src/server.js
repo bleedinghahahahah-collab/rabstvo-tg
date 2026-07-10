@@ -3,7 +3,7 @@ const path = require('path');
 const express = require('express');
 const { webhookCallback } = require('grammy');
 
-const { getUser, upsertUser, updateUser, ownedBy, freeUsers, stealableUsers, topByBalance, topByOwned, rankPosition } = require('./db');
+const { getUser, upsertUser, updateUser, ownedBy, freeUsers, stealableUsers, topByBalance, topByOwned, rankPosition, onlineCount } = require('./db');
 const {
   accrue,
   effectiveIncome,
@@ -56,6 +56,7 @@ function requireAuth(req, res, next) {
     first_name: tgUser.first_name,
   });
   accrue(user.id);
+  updateUser(user.id, { last_seen: Date.now() });
   req.userId = user.id;
   next();
 }
@@ -91,6 +92,11 @@ function publicUser(u) {
   };
 }
 
+// ---- GET /api/online — how many players are active right now ----
+app.get('/api/online', requireAuth, (req, res) => {
+  res.json({ count: onlineCount() });
+});
+
 // ---- GET /api/me ----
 app.get('/api/me', requireAuth, (req, res) => {
   const u = getUser(req.userId);
@@ -100,7 +106,10 @@ app.get('/api/me', requireAuth, (req, res) => {
 // ---- GET /api/market: free players you could try to acquire ----
 app.get('/api/market', requireAuth, (req, res) => {
   const now = Date.now();
-  const rows = freeUsers(req.userId, 15).filter((u) => !(u.shield_until && now < u.shield_until));
+  const me = getUser(req.userId);
+  const rows = freeUsers(req.userId, 15).filter(
+    (u) => !(u.shield_until && now < u.shield_until) && u.id !== me.owner_id
+  );
   const list = rows.map((u) => ({
     id: u.id,
     username: u.username,
@@ -119,6 +128,9 @@ app.post('/api/acquire', requireAuth, (req, res) => {
   const target = getUser(targetId);
   if (!target) return res.status(404).json({ error: 'Игрок не найден' });
   if (target.id === attacker.id) return res.status(400).json({ error: 'Себя не поработишь' });
+  if (target.id === attacker.owner_id) {
+    return res.status(400).json({ error: 'Сначала выкупи свою свободу в профиле — потом сможешь его захватить' });
+  }
   if (target.owner_id) return res.status(400).json({ error: 'Этот игрок уже кому-то принадлежит' });
   if (target.shield_until && Date.now() < target.shield_until) {
     return res.status(400).json({ error: 'Этот игрок сейчас под защитой от рабства' });
@@ -131,15 +143,9 @@ app.post('/api/acquire', requireAuth, (req, res) => {
 
   // Acquisitions always succeed now — no more chance involved.
   const job = randomJob();
-  const wasMyOwner = target.id === attacker.owner_id; // taking over your own current master
   updateUser(target.id, { owner_id: attacker.id, job: job.key, income_last_claim: Math.floor(Date.now() / 1000) });
-  if (wasMyOwner) {
-    // you can't own each other at once — taking over your master also frees you
-    updateUser(attacker.id, { owner_id: null });
-  }
   logEvent(target.id, 'acquired', { by: attacker.id, job: job.key });
   refreshRank(attacker.id);
-  if (wasMyOwner) refreshRank(target.id);
   notify(
     target.id,
     `Тебя поработил игрок ${displayName(attacker)}. Твоя новая работа: ${job.name}. Заработай на выкуп в разделе «Мои люди».`
@@ -151,7 +157,10 @@ app.post('/api/acquire', requireAuth, (req, res) => {
 // ---- GET /api/market/stealable: people already owned by SOMEONE ELSE ----
 app.get('/api/market/stealable', requireAuth, (req, res) => {
   const now = Date.now();
-  const rows = stealableUsers(req.userId, 15).filter((u) => !(u.shield_until && now < u.shield_until));
+  const me = getUser(req.userId);
+  const rows = stealableUsers(req.userId, 15).filter(
+    (u) => !(u.shield_until && now < u.shield_until) && u.id !== me.owner_id
+  );
   const list = rows.map((u) => {
     const owner = getUser(u.owner_id);
     return {
@@ -172,6 +181,9 @@ app.post('/api/steal', requireAuth, (req, res) => {
   const target = getUser(targetId);
   if (!target) return res.status(404).json({ error: 'Игрок не найден' });
   if (target.id === attacker.id) return res.status(400).json({ error: 'Себя не поработишь' });
+  if (target.id === attacker.owner_id) {
+    return res.status(400).json({ error: 'Сначала выкупи свою свободу в профиле — потом сможешь его увести' });
+  }
   if (!target.owner_id) return res.status(400).json({ error: 'Этот человек свободен — используй «Захватить» на вкладке «Свободные»' });
   if (target.owner_id === attacker.id) return res.status(400).json({ error: 'Он уже твой' });
   if (target.shield_until && Date.now() < target.shield_until) {
@@ -187,16 +199,10 @@ app.post('/api/steal', requireAuth, (req, res) => {
   updateUser(attacker.id, { balance: attacker.balance - cost });
 
   // Steals always succeed now — no more chance involved.
-  const wasMyOwner = target.id === attacker.owner_id; // taking over your own current master
   updateUser(target.id, { owner_id: attacker.id }); // keeps their existing job
-  if (wasMyOwner) {
-    // you can't own each other at once — taking over your master also frees you
-    updateUser(attacker.id, { owner_id: null });
-  }
   logEvent(target.id, 'stolen', { by: attacker.id, from: oldOwnerId });
   refreshRank(attacker.id);
   if (oldOwner) refreshRank(oldOwner.id);
-  if (wasMyOwner) refreshRank(target.id);
   notify(target.id, `Тебя увели у прежнего владельца. Теперь ты у игрока ${displayName(attacker)}.`);
   notify(oldOwnerId, `Твоего человека ${displayName(target)} увёл игрок ${displayName(attacker)}.`);
 
