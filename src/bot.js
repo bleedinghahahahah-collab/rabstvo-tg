@@ -1,5 +1,5 @@
 const { Bot, InlineKeyboard } = require('grammy');
-const { upsertUser, getUser, updateUser } = require('./db');
+const { upsertUser, getUser, updateUser, getUserByUsername } = require('./db');
 const { logEvent, randomJob } = require('./game');
 const { getShopItem, applyPurchase } = require('./shop');
 
@@ -95,6 +95,33 @@ function createBot({ token, webAppUrl }) {
 
   bot.command('help', (ctx) => {
     ctx.reply('Открой игру кнопкой из /start. Всё управление — внутри мини-приложения.');
+  });
+
+  // ---- /give — personal admin command, works only for your own Telegram ID ----
+  // Usage: /give @username 5000   or   /give 123456789 5000
+  bot.command('give', (ctx) => {
+    const adminId = Number(process.env.ADMIN_ID);
+    if (!adminId || ctx.from.id !== adminId) return; // silently ignore everyone else
+
+    const args = (ctx.match || '').trim().split(/\s+/).filter(Boolean);
+    if (args.length < 2) {
+      return ctx.reply('Использование:\n/give @username 5000\nили\n/give 123456789 5000');
+    }
+
+    const [target, amountStr] = args;
+    const amount = Number(amountStr);
+    if (!Number.isFinite(amount)) {
+      return ctx.reply('Сумма должна быть числом, например: /give @friend 5000');
+    }
+
+    const user = target.startsWith('@') ? getUserByUsername(target) : getUser(Number(target));
+    if (!user) {
+      return ctx.reply('Игрок не найден — он должен хотя бы раз открыть бота через /start.');
+    }
+
+    updateUser(user.id, { balance: user.balance + amount });
+    const name = user.username ? '@' + user.username : user.first_name || user.id;
+    ctx.reply(`Готово: ${name} теперь ${getUser(user.id).balance} монет (${amount >= 0 ? '+' : ''}${amount}).`);
   });
 
   return bot;

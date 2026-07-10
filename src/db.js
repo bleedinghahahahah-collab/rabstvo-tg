@@ -80,6 +80,11 @@ function allUsers() {
   return Object.values(state.users);
 }
 
+function getUserByUsername(username) {
+  const clean = (username || '').replace(/^@/, '').toLowerCase();
+  return allUsers().find((u) => (u.username || '').toLowerCase() === clean) || null;
+}
+
 // ---- How many players have been active in the last `windowMs` — powers the
 // "X играют сейчас" indicator. Matches the frontend's 8s status-poll interval
 // with some slack so it doesn't flicker between polls. ----
@@ -149,6 +154,7 @@ module.exports = {
   upsertUser,
   updateUser,
   allUsers,
+  getUserByUsername,
   ownedBy,
   freeUsers,
   stealableUsers,
