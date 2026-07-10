@@ -97,11 +97,18 @@ function createBot({ token, webAppUrl }) {
     ctx.reply('Открой игру кнопкой из /start. Всё управление — внутри мини-приложения.');
   });
 
-  // ---- /give — personal admin command, works only for your own Telegram ID ----
-  // Usage: /give @username 5000   or   /give 123456789 5000
+  // ---- /give — personal admin command, works only for the Telegram ID(s)
+  // listed in ADMIN_ID. Supports one ID or several, e.g.:
+  //   ADMIN_ID=123456789
+  //   ADMIN_ID=123456789,987654321
+  //   ADMIN_ID=[123456789,987654321]   (brackets are fine too, just ignored)
   bot.command('give', (ctx) => {
-    const adminId = Number(process.env.ADMIN_ID);
-    if (!adminId || ctx.from.id !== adminId) return; // silently ignore everyone else
+    const adminIds = (process.env.ADMIN_ID || '')
+      .replace(/[[\]\s]/g, '')
+      .split(',')
+      .map(Number)
+      .filter(Number.isFinite);
+    if (!adminIds.includes(ctx.from.id)) return; // silently ignore everyone else
 
     const args = (ctx.match || '').trim().split(/\s+/).filter(Boolean);
     if (args.length < 2) {
