@@ -176,10 +176,35 @@
 
     <section class="panel" data-panel="shop">
       <div class="section-title">
-        <span class="eyebrow">За звёзды Telegram</span>
+        <span class="eyebrow">За звёзды и монеты</span>
         <h2>Магазин</h2>
       </div>
-      <div class="list" id="shop-list"><div class="empty-state">Загрузка…</div></div>
+
+      <div class="shop-bar">
+        <div class="shop-bar-title">Монеты</div>
+        <div class="list" id="shop-list-coins"><div class="empty-state">Загрузка…</div></div>
+      </div>
+
+      <div class="shop-bar">
+        <div class="shop-bar-title">Услуги</div>
+        <div class="list" id="shop-list-services"><div class="empty-state">Загрузка…</div></div>
+      </div>
+
+      <div class="shop-bar">
+        <div class="shop-bar-title">Фарм</div>
+        <div class="list" id="shop-list-farm">
+          <div class="ledger-row" style="flex-wrap:wrap;">
+            <div style="min-width:0;flex:1;">
+              <div class="row-name">Улучшение тапа</div>
+              <div class="row-meta" id="tap-upgrade-meta">Уровень 0 · +0.0 к тапу</div>
+            </div>
+            <div class="row-value" id="tap-upgrade-cost">—</div>
+            <div class="row-actions">
+              <button class="mini-btn buy" id="btn-upgrade-tap">Улучшить</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="panel" data-panel="top">

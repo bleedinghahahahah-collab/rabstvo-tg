@@ -163,6 +163,39 @@ const FARM_TAP_LIMIT = 5000;
 const FARM_COOLDOWN_MS = 3 * 60 * 60 * 1000;
 const FARM_MIN_INTERVAL_MS = 60; // ~16 taps/sec — comfortably covers fast two-finger tapping
 
+// ---- Permanent tap-value upgrade, bought with in-game coins (not Stars).
+// Each level adds +0.1 to every tap; price grows 35% per level. ----
+const TAP_UPGRADE_BASE_COST = 150;
+const TAP_UPGRADE_MULTIPLIER = 1.35;
+const TAP_UPGRADE_INCREMENT = 0.1;
+
+function tapUpgradeCost(level) {
+  return Math.floor(TAP_UPGRADE_BASE_COST * Math.pow(TAP_UPGRADE_MULTIPLIER, level));
+}
+
+function baseTapValue(user) {
+  return FARM_REWARD + (user.tap_upgrade_level || 0) * TAP_UPGRADE_INCREMENT;
+}
+
+// ---- Buy one level of the permanent tap upgrade with coins ----
+function tryBuyTapUpgrade(userId) {
+  const u = getUser(userId);
+  if (!u) return { ok: false, error: 'not_found' };
+  const level = u.tap_upgrade_level || 0;
+  const cost = tapUpgradeCost(level);
+  if (u.balance < cost) return { ok: false, error: 'not_enough', cost };
+
+  const newLevel = level + 1;
+  updateUser(userId, { balance: Math.round((u.balance - cost) * 10) / 10, tap_upgrade_level: newLevel });
+  return {
+    ok: true,
+    level: newLevel,
+    tap_value: Math.round(baseTapValue(getUser(userId)) * 100) / 100,
+    next_cost: tapUpgradeCost(newLevel),
+    balance: getUser(userId).balance,
+  };
+}
+
 function farmStatus(user) {
   const now = Date.now();
   if (user.farm_cooldown_until && now >= user.farm_cooldown_until) {
@@ -201,7 +234,8 @@ function tryFarmTap(userId) {
 
   const newTaps = (u.farm_taps || 0) + 1;
   const boosted = u.tap_boost_until && now < u.tap_boost_until;
-  const reward = boosted ? FARM_REWARD * 2 : FARM_REWARD;
+  const base = baseTapValue(u);
+  const reward = Math.round((boosted ? base * 2 : base) * 10) / 10;
   const newBalance = Math.round((u.balance + reward) * 10) / 10;
   const patch = { balance: newBalance, farm_taps: newTaps, farm_last_tap: now };
 
@@ -271,4 +305,7 @@ module.exports = {
   farmStatus,
   tryFarmTap,
   runFarmCooldownTick,
+  tapUpgradeCost,
+  baseTapValue,
+  tryBuyTapUpgrade,
 };

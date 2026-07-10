@@ -657,59 +657,90 @@ farmBtnEl.addEventListener(
 farmBtnEl.addEventListener('click', () => attemptFarmTap(farmBtnEl));
 
 // ===== Shop tab: buy with Telegram Stars =====
-async function loadShop() {
-  const list = document.getElementById('shop-list');
-  list.innerHTML = '<div class="empty-state">Загрузка…</div>';
-  const items = await api('/api/shop/items');
-  list.innerHTML = '';
-  items.forEach((item) => {
-    const row = document.createElement('div');
-    row.className = 'ledger-row';
-    row.style.flexWrap = 'wrap';
-    row.innerHTML = `
-      <div style="min-width:0;flex:1;">
-        <div class="row-name">${item.title}</div>
-        <div class="row-meta">${item.description}</div>
-      </div>
-      <div class="row-value">${item.price} звёзд</div>
-      <div class="row-actions">
-        <button class="mini-btn buy" data-key="${item.key}">Купить</button>
-      </div>
-    `;
-    row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
-      ev.target.disabled = true;
-      try {
-        const { link } = await api('/api/shop/invoice', {
-          method: 'POST',
-          body: JSON.stringify({ item: item.key }),
-        });
-        if (!tg?.openInvoice) {
-          toast('Открой это в Telegram, чтобы оплатить звёздами');
-          ev.target.disabled = false;
-          return;
-        }
-        tg.openInvoice(link, (status) => {
-          ev.target.disabled = false;
-          if (status === 'paid') {
-            toast('Оплачено! Обновляю...');
-            setTimeout(() => {
-              loadMe();
-              loadShop();
-            }, 1200); // small delay so the bot's successful_payment handler has time to apply it
-          } else if (status === 'cancelled') {
-            toast('Оплата отменена');
-          } else if (status === 'failed') {
-            toast('Платёж не прошёл');
-          }
-        });
-      } catch (e) {
-        toast(e.message);
+function renderShopRow(item, listEl) {
+  const row = document.createElement('div');
+  row.className = 'ledger-row';
+  row.style.flexWrap = 'wrap';
+  row.innerHTML = `
+    <div style="min-width:0;flex:1;">
+      <div class="row-name">${item.title}</div>
+      <div class="row-meta">${item.description}</div>
+    </div>
+    <div class="row-value">${item.price} звёзд</div>
+    <div class="row-actions">
+      <button class="mini-btn buy" data-key="${item.key}">Купить</button>
+    </div>
+  `;
+  row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
+    ev.target.disabled = true;
+    try {
+      const { link } = await api('/api/shop/invoice', {
+        method: 'POST',
+        body: JSON.stringify({ item: item.key }),
+      });
+      if (!tg?.openInvoice) {
+        toast('Открой это в Telegram, чтобы оплатить звёздами');
         ev.target.disabled = false;
+        return;
       }
-    });
-    list.appendChild(row);
+      tg.openInvoice(link, (status) => {
+        ev.target.disabled = false;
+        if (status === 'paid') {
+          toast('Оплачено! Обновляю...');
+          setTimeout(() => {
+            loadMe();
+            loadShop();
+          }, 1200); // small delay so the bot's successful_payment handler has time to apply it
+        } else if (status === 'cancelled') {
+          toast('Оплата отменена');
+        } else if (status === 'failed') {
+          toast('Платёж не прошёл');
+        }
+      });
+    } catch (e) {
+      toast(e.message);
+      ev.target.disabled = false;
+    }
   });
+  listEl.appendChild(row);
 }
+
+async function loadShop() {
+  const coinsList = document.getElementById('shop-list-coins');
+  const servicesList = document.getElementById('shop-list-services');
+  coinsList.innerHTML = '<div class="empty-state">Загрузка…</div>';
+  servicesList.innerHTML = '<div class="empty-state">Загрузка…</div>';
+
+  const items = await api('/api/shop/items');
+  coinsList.innerHTML = '';
+  servicesList.innerHTML = '';
+  items.forEach((item) => {
+    renderShopRow(item, item.category === 'services' ? servicesList : coinsList);
+  });
+
+  await loadTapUpgradeStatus();
+}
+
+async function loadTapUpgradeStatus() {
+  const status = await api('/api/farm/status');
+  document.getElementById('tap-upgrade-meta').textContent =
+    `Уровень ${status.tap_upgrade_level} · сейчас +${fmtDec(status.tap_value)} за тап`;
+  document.getElementById('tap-upgrade-cost').textContent = fmt(status.tap_upgrade_cost);
+}
+
+document.getElementById('btn-upgrade-tap').addEventListener('click', async (ev) => {
+  ev.target.disabled = true;
+  try {
+    const r = await api('/api/farm/upgrade-tap', { method: 'POST' });
+    toast(`Улучшено! Теперь +${fmtDec(r.tap_value)} за тап`);
+    document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
+    await loadTapUpgradeStatus();
+  } catch (e) {
+    toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
+  } finally {
+    ev.target.disabled = false;
+  }
+});
 
 document.getElementById('btn-copy-link').addEventListener('click', async () => {
   try {

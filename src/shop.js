@@ -1,6 +1,7 @@
 const { getUser, updateUser } = require('./db');
 
-// ---- Shop catalog: price is in Telegram Stars (XTR), no decimals allowed ----
+// ---- Shop catalog: price is in Telegram Stars (XTR), no decimals allowed.
+// `category` groups items into the three shop bars on the frontend. ----
 const SHOP_ITEMS = {
   coins_2000: {
     title: 'Пакет: 2000 монет',
@@ -8,6 +9,7 @@ const SHOP_ITEMS = {
     price: 20,
     kind: 'coins',
     amount: 2000,
+    category: 'coins',
   },
   coins_3000: {
     title: 'Пакет: 3000 монет',
@@ -15,6 +17,7 @@ const SHOP_ITEMS = {
     price: 30,
     kind: 'coins',
     amount: 3000,
+    category: 'coins',
   },
   coins_4000: {
     title: 'Пакет: 4000 монет',
@@ -22,6 +25,7 @@ const SHOP_ITEMS = {
     price: 40,
     kind: 'coins',
     amount: 4000,
+    category: 'coins',
   },
   coins_5000: {
     title: 'Пакет: 5000 монет',
@@ -29,12 +33,14 @@ const SHOP_ITEMS = {
     price: 50,
     kind: 'coins',
     amount: 5000,
+    category: 'coins',
   },
   freedom: {
     title: 'Снятие из рабства',
     description: 'Мгновенно выходишь из услужения, без выкупа',
     price: 50,
     kind: 'freedom',
+    category: 'services',
   },
   shield: {
     title: 'Защита от рабства (24 часа)',
@@ -42,13 +48,15 @@ const SHOP_ITEMS = {
     price: 25,
     kind: 'shield',
     durationMs: 24 * 60 * 60 * 1000,
+    category: 'services',
   },
   tap_boost: {
-    title: 'Бустер тапа x2 (1 час)',
-    description: 'Каждый тап на ферме даёт вдвое больше монет час',
-    price: 5,
+    title: 'Бустер тапа x2 (15 минут)',
+    description: 'Каждый тап на ферме даёт вдвое больше монет 15 минут',
+    price: 25,
     kind: 'tap_boost',
-    durationMs: 60 * 60 * 1000,
+    durationMs: 15 * 60 * 1000,
+    category: 'services',
   },
 };
 
@@ -62,6 +70,7 @@ function listShopItems() {
     title: item.title,
     description: item.description,
     price: item.price,
+    category: item.category,
   }));
 }
 

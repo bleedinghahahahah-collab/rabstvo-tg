@@ -60,6 +60,7 @@ function upsertUser({ id, username, first_name, ref_by }) {
       shield_until: 0,
       tap_boost_until: 0,
       times_ransomed: 0,
+      tap_upgrade_level: 0,
       last_seen: 0,
     };
     state.users[id] = u;

@@ -16,6 +16,33 @@
 
 * { box-sizing: border-box; }
 
+/* ===================================================================
+   Shimmer text — a soft light sweep runs across bright headings/values,
+   giving the whole app a subtle "alive" premium feel.
+   =================================================================== */
+.shimmer-text {
+  background: linear-gradient(
+    100deg,
+    var(--paper) 30%,
+    var(--gray-bright) 42%,
+    #ffffff 50%,
+    var(--gray-bright) 58%,
+    var(--paper) 70%
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmerText 3.2s linear infinite;
+}
+@keyframes shimmerText {
+  0% { background-position: 200% center; }
+  100% { background-position: -50% center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text { animation: none; -webkit-text-fill-color: var(--paper); }
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -228,6 +255,38 @@ html, body {
 
 .ledger-main { flex: 1 1 auto; min-width: 0; }
 
+.ledger-name,
+.balance-figure,
+.substat-value,
+.row-name,
+.rank-progress-current,
+.section-title h2 {
+  background: linear-gradient(
+    100deg,
+    var(--paper) 30%,
+    var(--gray-bright) 42%,
+    #ffffff 50%,
+    var(--gray-bright) 58%,
+    var(--paper) 70%
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmerText 3.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ledger-name,
+  .balance-figure,
+  .substat-value,
+  .row-name,
+  .rank-progress-current,
+  .section-title h2 {
+    animation: none;
+    -webkit-text-fill-color: var(--paper);
+  }
+}
+
 .ledger-name {
   font-size: 15px;
   font-weight: 700;
@@ -349,6 +408,24 @@ main#panels {
 }
 
 /* ===== Segmented toggle (Market: Свободные / Украсть) ===== */
+/* ===== Shop bars (Монеты / Услуги / Фарм) ===== */
+.shop-bar {
+  border: 1px solid var(--gray-line);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 14px;
+  background: rgba(255, 255, 255, 0.015);
+}
+.shop-bar-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
 .segmented {
   display: flex;
   gap: 4px;
@@ -376,16 +453,16 @@ main#panels {
 }
 
 /* ===== List rows ===== */
-.list { display: flex; flex-direction: column; gap: 8px; }
+.list { display: flex; flex-direction: column; gap: 7px; }
 
 .ledger-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   background: var(--ink-raised);
-  border: 1px solid var(--gray-line);
+  border: 1px solid var(--gray-accent);
   border-radius: 10px;
-  padding: 12px 12px;
+  padding: 10px 11px;
 }
 
 .row-seal {
@@ -521,12 +598,16 @@ main#panels {
 .mini-btn {
   flex: 1;
   border: 1px solid var(--gray-accent);
-  background: #181818;
+  background:
+    linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%),
+    #181818;
+  background-size: 300% 300%, 100% 100%;
+  animation: glowShimmer 2.8s ease-in-out infinite;
   color: var(--gray-bright);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 12px;
-  padding: 8px 6px;
+  padding: 7px 6px;
   border-radius: 7px;
   box-shadow: 0 3px 0 #050505, 0 5px 8px rgba(0,0,0,0.4);
   transition: transform .12s cubic-bezier(.4,0,.2,1), box-shadow .12s cubic-bezier(.4,0,.2,1), background .15s ease;
@@ -555,15 +636,19 @@ main#panels {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #151515;
+  background:
+    linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%),
+    #151515;
+  background-size: 300% 300%, 100% 100%;
+  animation: glowShimmer 2.8s ease-in-out infinite;
   border: 1px solid var(--gray-line);
   color: var(--paper);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 14px;
-  padding: 14px;
+  padding: 12px 14px;
   border-radius: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   box-shadow: 0 3px 0 #000, 0 6px 10px rgba(0,0,0,0.45);
   transition: transform .12s cubic-bezier(.4,0,.2,1), box-shadow .12s cubic-bezier(.4,0,.2,1), background .15s ease;
 }

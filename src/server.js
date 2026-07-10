@@ -22,6 +22,9 @@ const {
   stealCost,
   farmStatus,
   tryFarmTap,
+  tapUpgradeCost,
+  baseTapValue,
+  tryBuyTapUpgrade,
   runFarmCooldownTick,
 } = require('./game');
 const { verifyInitData } = require('./auth');
@@ -346,7 +349,22 @@ app.post('/api/daily', requireAuth, (req, res) => {
 // ---- GET /api/farm/status ----
 app.get('/api/farm/status', requireAuth, (req, res) => {
   const me = getUser(req.userId);
-  res.json(farmStatus(me));
+  const level = me.tap_upgrade_level || 0;
+  res.json({
+    ...farmStatus(me),
+    tap_upgrade_level: level,
+    tap_value: Math.round(baseTapValue(me) * 100) / 100,
+    tap_upgrade_cost: tapUpgradeCost(level),
+  });
+});
+
+// ---- POST /api/farm/upgrade-tap — permanent tap-value upgrade, paid in coins ----
+app.post('/api/farm/upgrade-tap', requireAuth, (req, res) => {
+  const result = tryBuyTapUpgrade(req.userId);
+  if (!result.ok) {
+    return res.status(400).json({ error: 'Недостаточно монет', cost: result.cost });
+  }
+  res.json(result);
 });
 
 // ---- POST /api/farm/tap ----
