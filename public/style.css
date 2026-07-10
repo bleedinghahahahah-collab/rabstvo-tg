@@ -21,26 +21,14 @@
    giving the whole app a subtle "alive" premium feel.
    =================================================================== */
 .shimmer-text {
-  background: linear-gradient(
-    100deg,
-    #8a8a8a 25%,
-    #d8d8d8 40%,
-    #ffffff 50%,
-    #d8d8d8 60%,
-    #8a8a8a 75%
-  );
-  background-size: 300% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shimmerText 2.2s linear infinite;
+  animation: textFlicker 4s ease-in-out infinite;
 }
-@keyframes shimmerText {
-  0% { background-position: 250% center; }
-  100% { background-position: -50% center; }
+@keyframes textFlicker {
+  0%, 18%, 22%, 54%, 58%, 100% { opacity: 1; }
+  20%, 56% { opacity: 0.55; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .shimmer-text { animation: none; -webkit-text-fill-color: var(--paper); }
+  .shimmer-text { animation: none; }
 }
 
 html, body {
@@ -260,20 +248,10 @@ html, body {
 .substat-value,
 .row-name,
 .rank-progress-current,
-.section-title h2 {
-  background: linear-gradient(
-    100deg,
-    #8a8a8a 25%,
-    #d8d8d8 40%,
-    #ffffff 50%,
-    #d8d8d8 60%,
-    #8a8a8a 75%
-  );
-  background-size: 300% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shimmerText 2.2s linear infinite;
+.section-title h2,
+.shop-menu-title,
+.invite-hero-title {
+  animation: textFlicker 4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .ledger-name,
@@ -281,9 +259,10 @@ html, body {
   .substat-value,
   .row-name,
   .rank-progress-current,
-  .section-title h2 {
+  .section-title h2,
+  .shop-menu-title,
+  .invite-hero-title {
     animation: none;
-    -webkit-text-fill-color: var(--paper);
   }
 }
 
@@ -693,7 +672,7 @@ main#panels {
 .invite-copy { font-size: 13.5px; color: var(--gray-muted); line-height: 1.5; margin-bottom: 16px; }
 
 /* ===== Profile: rank progress + streak cards ===== */
-.profile-status {
+.profile-status-box {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -701,6 +680,10 @@ main#panels {
   font-weight: 700;
   color: var(--green);
   margin-bottom: 14px;
+  border: 1.5px solid var(--green);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: rgba(62, 207, 142, 0.08);
 }
 .profile-status-dot {
   width: 9px;
@@ -709,8 +692,8 @@ main#panels {
   background: var(--green);
   box-shadow: 0 0 7px rgba(62, 207, 142, 0.6);
 }
-.profile-status.enslaved { color: var(--red); }
-.profile-status.enslaved .profile-status-dot { background: var(--red); box-shadow: 0 0 7px rgba(229, 72, 77, 0.6); }
+.profile-status-box.enslaved { color: var(--red); border-color: var(--red); background: rgba(229, 72, 77, 0.08); }
+.profile-status-box.enslaved .profile-status-dot { background: var(--red); box-shadow: 0 0 7px rgba(229, 72, 77, 0.6); }
 
 .rank-progress-card {
   background: var(--ink-raised);

@@ -109,36 +109,37 @@ function effectiveIncome(u) {
   return u.income_per_hour + jobIncome;
 }
 
-// ---- Cost to acquire a target: scales with their protection + how many people they own ----
-// ---- Cost to acquire a free target: grows with how many people they
-// already own (a well-built player is worth more) and with how many times
-// they've bought their own freedom before (recapturing a repeat escapee
-// costs more each time). No chance involved — if you can afford it, you
-// get them. ----
+// ---- Cost to acquire a free target: 500 base + 35% of their current
+// income + how many people they already own, then +15% on top of that
+// total. No chance involved — if you can afford it, you get them. ----
 function acquisitionCost(target) {
+  const income = effectiveIncome(target);
   const owned = ownedCount(target.id);
-  const timesRansomed = target.times_ransomed || 0;
-  return Math.floor(280 * Math.pow(1.15, owned) * Math.pow(1.4, timesRansomed));
+  const sum = 500 + income * 0.35 + owned;
+  return Math.floor(sum * 1.15);
 }
 
-// ---- Price to buy your own freedom: reflects how valuable you are as an
-// asset (your job income + your own little empire), not just your balance ----
+// ---- Price to buy your own freedom: you're not fighting the person
+// themselves, you're overcoming whoever currently owns them — 35% of the
+// OWNER's balance + however many people the owner already has, +15% on
+// top. A rich, well-built owner is much harder to buy your way out from. ----
 function ransomCost(person) {
-  const job = jobByKey(person.job);
-  const jobIncome = job ? job.income : 12;
-  const owned = ownedCount(person.id);
-  return Math.floor(180 + jobIncome * 12 + owned * 70 + person.balance * 0.15);
+  const owner = getUser(person.owner_id);
+  if (!owner) return 0;
+  const ownerOwned = ownedCount(owner.id);
+  const sum = owner.balance * 0.35 + ownerOwned;
+  return Math.floor(sum * 1.15);
 }
 
-// ---- Stealing someone who's already enslaved: the price scales with how
-// big their CURRENT OWNER's network is (poaching from an established player
-// costs more) and with the target's own repeat-ransom history. Also no
-// chance involved anymore — always succeeds if you can pay. ----
+// ---- Stealing someone who's already enslaved uses the exact same logic as
+// ransom above — you're overcoming their CURRENT OWNER's grip either way,
+// whether it's them buying out or you poaching them. ----
 function stealCost(target) {
   const owner = getUser(target.owner_id);
-  const ownerOwned = owner ? ownedCount(owner.id) : 0;
-  const timesRansomed = target.times_ransomed || 0;
-  return Math.floor(320 * Math.pow(1.15, ownerOwned) * Math.pow(1.4, timesRansomed));
+  if (!owner) return 0;
+  const ownerOwned = ownedCount(owner.id);
+  const sum = owner.balance * 0.35 + ownerOwned;
+  return Math.floor(sum * 1.15);
 }
 
 // NOTE: protection upgrades were removed as a player-facing feature per
@@ -166,8 +167,8 @@ const FARM_MIN_INTERVAL_MS = 60; // ~16 taps/sec — comfortably covers fast two
 // ---- Permanent tap-value upgrade, bought with in-game coins (not Stars).
 // Each level adds +0.1 to every tap; price grows 35% per level. ----
 const TAP_UPGRADE_BASE_COST = 150;
-const TAP_UPGRADE_MULTIPLIER = 1.35;
-const TAP_UPGRADE_INCREMENT = 0.1;
+const TAP_UPGRADE_MULTIPLIER = 1.05;
+const TAP_UPGRADE_INCREMENT = 0.2;
 
 function tapUpgradeCost(level) {
   return Math.floor(TAP_UPGRADE_BASE_COST * Math.pow(TAP_UPGRADE_MULTIPLIER, level));

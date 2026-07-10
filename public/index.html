@@ -79,9 +79,19 @@
         <h2>Профиль</h2>
       </div>
 
-      <div class="profile-status" id="profile-status">
+      <div class="profile-status-box" id="profile-status">
         <span class="profile-status-dot"></span>
         <span id="profile-status-text">Свободен</span>
+      </div>
+
+      <div id="ransom-section" style="display:none">
+        <div class="hint-box" id="ransom-hint">
+          Ты сейчас у кого-то в услужении. Пока не выкупишься — часть дохода уходит владельцу.
+        </div>
+        <button class="action-btn glow-btn red" id="btn-ransom">
+          <span>Выкупить свою свободу</span>
+          <span class="btn-sub" id="ransom-cost">—</span>
+        </button>
       </div>
 
       <div class="rank-progress-card">
@@ -114,16 +124,6 @@
           <span class="invite-reward-figure" id="my-rank-owned">—</span>
           <span class="invite-reward-label">место по рабам</span>
         </div>
-      </div>
-
-      <div id="ransom-section" style="display:none">
-        <div class="hint-box" id="ransom-hint">
-          Ты сейчас у кого-то в услужении. Пока не выкупишься — часть дохода уходит владельцу.
-        </div>
-        <button class="action-btn glow-btn red" id="btn-ransom">
-          <span>Выкупить свою свободу</span>
-          <span class="btn-sub" id="ransom-cost">—</span>
-        </button>
       </div>
     </section>
 
@@ -251,7 +251,7 @@
 
       <div class="invite-rewards">
         <div class="invite-reward-card">
-          <span class="invite-reward-figure">+300</span>
+          <span class="invite-reward-figure">+1500</span>
           <span class="invite-reward-label">тебе за приглашение</span>
         </div>
         <div class="invite-reward-card">

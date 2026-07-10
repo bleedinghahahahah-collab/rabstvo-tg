@@ -23,16 +23,16 @@ function createBot({ token, webAppUrl }) {
     });
 
     // First-time join via referral: the invited player starts with a flat
-    // 1000 (instead of the usual 500 for organic joins) and starts out
+    // 1000 (same as the usual organic-join balance) and starts out
     // already "in service to" the inviter — ties the invite system directly
-    // into the core ownership mechanic. The inviter gets a flat +300.
+    // into the core ownership mechanic. The inviter gets a flat +1500.
     let joinedViaReferral = false;
     if (!alreadyExists && refBy) {
       const inviter = getUser(refBy);
       if (inviter) {
         joinedViaReferral = true;
         const job = randomJob();
-        updateUser(refBy, { balance: inviter.balance + 300 });
+        updateUser(refBy, { balance: inviter.balance + 1500 });
         updateUser(user.id, {
           balance: 1000,
           owner_id: refBy,
