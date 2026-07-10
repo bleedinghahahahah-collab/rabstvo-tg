@@ -43,7 +43,7 @@ function upsertUser({ id, username, first_name, ref_by }) {
       id,
       username: username || null,
       first_name: first_name || null,
-      balance: 500,
+      balance: 1000,
       protection: 1,
       income_per_hour: 70,
       owner_id: null,
@@ -59,6 +59,7 @@ function upsertUser({ id, username, first_name, ref_by }) {
       farm_cooldown_until: 0,
       shield_until: 0,
       tap_boost_until: 0,
+      times_ransomed: 0,
     };
     state.users[id] = u;
   }

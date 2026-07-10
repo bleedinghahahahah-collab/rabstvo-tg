@@ -9,7 +9,6 @@ const {
   effectiveIncome,
   ownedCount,
   acquisitionCost,
-  successChance,
   logEvent,
   refreshRank,
   rankFor,
@@ -21,7 +20,6 @@ const {
   collectFromPerson,
   ransomCost,
   stealCost,
-  stealChance,
   farmStatus,
   tryFarmTap,
   runFarmCooldownTick,
@@ -126,24 +124,23 @@ app.post('/api/acquire', requireAuth, (req, res) => {
 
   updateUser(attacker.id, { balance: attacker.balance - cost });
 
-  const chance = successChance(attacker, target);
-  const success = Math.random() < chance;
-
-  if (success) {
-    const job = randomJob();
-    updateUser(target.id, { owner_id: attacker.id, job: job.key, income_last_claim: Math.floor(Date.now() / 1000) });
-    logEvent(target.id, 'acquired', { by: attacker.id, job: job.key });
-    refreshRank(attacker.id);
-    notify(
-      target.id,
-      `Тебя поработил игрок ${displayName(attacker)}. Твоя новая работа: ${job.name}. Заработай на выкуп в разделе «Мои люди».`
-    );
-  } else {
-    logEvent(attacker.id, 'raid_failed', { target: target.id });
-    notify(target.id, `Игрок ${displayName(attacker)} попытался тебя захватить — твоя защита выстояла.`);
+  // Acquisitions always succeed now — no more chance involved.
+  const job = randomJob();
+  const wasMyOwner = target.id === attacker.owner_id; // taking over your own current master
+  updateUser(target.id, { owner_id: attacker.id, job: job.key, income_last_claim: Math.floor(Date.now() / 1000) });
+  if (wasMyOwner) {
+    // you can't own each other at once — taking over your master also frees you
+    updateUser(attacker.id, { owner_id: null });
   }
+  logEvent(target.id, 'acquired', { by: attacker.id, job: job.key });
+  refreshRank(attacker.id);
+  if (wasMyOwner) refreshRank(target.id);
+  notify(
+    target.id,
+    `Тебя поработил игрок ${displayName(attacker)}. Твоя новая работа: ${job.name}. Заработай на выкуп в разделе «Мои люди».`
+  );
 
-  res.json({ success, chance: Math.round(chance * 100), spent: cost, balance: getUser(attacker.id).balance });
+  res.json({ success: true, spent: cost, balance: getUser(attacker.id).balance });
 });
 
 // ---- GET /api/market/stealable: people already owned by SOMEONE ELSE ----
@@ -184,22 +181,21 @@ app.post('/api/steal', requireAuth, (req, res) => {
 
   updateUser(attacker.id, { balance: attacker.balance - cost });
 
-  const chance = stealChance(attacker, target);
-  const success = Math.random() < chance;
-
-  if (success) {
-    updateUser(target.id, { owner_id: attacker.id }); // keeps their existing job
-    logEvent(target.id, 'stolen', { by: attacker.id, from: oldOwnerId });
-    refreshRank(attacker.id);
-    if (oldOwner) refreshRank(oldOwner.id);
-    notify(target.id, `Тебя увели у прежнего владельца. Теперь ты у игрока ${displayName(attacker)}.`);
-    notify(oldOwnerId, `Твоего человека ${displayName(target)} увёл игрок ${displayName(attacker)}.`);
-  } else {
-    logEvent(attacker.id, 'steal_failed', { target: target.id, owner: oldOwnerId });
-    notify(oldOwnerId, `Игрок ${displayName(attacker)} пытался увести твоего человека ${displayName(target)} — не вышло.`);
+  // Steals always succeed now — no more chance involved.
+  const wasMyOwner = target.id === attacker.owner_id; // taking over your own current master
+  updateUser(target.id, { owner_id: attacker.id }); // keeps their existing job
+  if (wasMyOwner) {
+    // you can't own each other at once — taking over your master also frees you
+    updateUser(attacker.id, { owner_id: null });
   }
+  logEvent(target.id, 'stolen', { by: attacker.id, from: oldOwnerId });
+  refreshRank(attacker.id);
+  if (oldOwner) refreshRank(oldOwner.id);
+  if (wasMyOwner) refreshRank(target.id);
+  notify(target.id, `Тебя увели у прежнего владельца. Теперь ты у игрока ${displayName(attacker)}.`);
+  notify(oldOwnerId, `Твоего человека ${displayName(target)} увёл игрок ${displayName(attacker)}.`);
 
-  res.json({ success, chance: Math.round(chance * 100), spent: cost, balance: getUser(attacker.id).balance });
+  res.json({ success: true, spent: cost, balance: getUser(attacker.id).balance });
 });
 
 // ---- GET /api/my-people: people you own ----
@@ -255,7 +251,7 @@ app.post('/api/ransom', requireAuth, (req, res) => {
   const cost = ransomCost(me);
   if (me.balance < cost) return res.status(400).json({ error: 'Недостаточно монет для выкупа', cost });
   const oldOwner = me.owner_id;
-  updateUser(me.id, { balance: me.balance - cost, owner_id: null });
+  updateUser(me.id, { balance: me.balance - cost, owner_id: null, times_ransomed: (me.times_ransomed || 0) + 1 });
   logEvent(me.id, 'ransomed', { from: oldOwner });
   refreshRank(oldOwner);
   notify(oldOwner, `Один из твоих людей выкупил свою свободу.`);

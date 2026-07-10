@@ -81,7 +81,7 @@ function applyPurchase(userId, itemKey) {
       updateUser(userId, { balance: user.balance + item.amount });
       break;
     case 'freedom':
-      updateUser(userId, { owner_id: null });
+      updateUser(userId, { owner_id: null, times_ransomed: (user.times_ransomed || 0) + 1 });
       break;
     case 'shield':
       updateUser(userId, { shield_until: now + item.durationMs });

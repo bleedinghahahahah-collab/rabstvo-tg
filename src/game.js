@@ -110,19 +110,15 @@ function effectiveIncome(u) {
 }
 
 // ---- Cost to acquire a target: scales with their protection + how many people they own ----
+// ---- Cost to acquire a free target: grows with how many people they
+// already own (a well-built player is worth more) and with how many times
+// they've bought their own freedom before (recapturing a repeat escapee
+// costs more each time). No chance involved — if you can afford it, you
+// get them. ----
 function acquisitionCost(target) {
   const owned = ownedCount(target.id);
-  return Math.floor(280 * Math.pow(1.35, target.protection - 1) + owned * 140);
-}
-
-// ---- Chance attacker succeeds: weighted so weak targets (few/no people of
-// their own) are noticeably easy to take, and well-built targets are
-// noticeably harder — with a higher overall baseline than before. ----
-function successChance(attacker, target) {
-  const atkPower = 10 + ownedCount(attacker.id) * 4 + attacker.protection * 2;
-  const defPower = 10 + ownedCount(target.id) * 6 + target.protection * 2;
-  const raw = atkPower / (atkPower + defPower);
-  return Math.min(0.92, Math.max(0.25, raw));
+  const timesRansomed = target.times_ransomed || 0;
+  return Math.floor(280 * Math.pow(1.15, owned) * Math.pow(1.4, timesRansomed));
 }
 
 // ---- Price to buy your own freedom: reflects how valuable you are as an
@@ -134,31 +130,20 @@ function ransomCost(person) {
   return Math.floor(180 + jobIncome * 12 + owned * 70 + person.balance * 0.15);
 }
 
-// ---- Stealing someone who's already enslaved: you're not fighting the
-// person themselves, you're fighting whoever currently owns them. Cost and
-// chance both scale off the CURRENT OWNER's strength — stealing from a big
-// established player is much harder than from someone who barely has
-// anything built up. ----
+// ---- Stealing someone who's already enslaved: the price scales with how
+// big their CURRENT OWNER's network is (poaching from an established player
+// costs more) and with the target's own repeat-ransom history. Also no
+// chance involved anymore — always succeeds if you can pay. ----
 function stealCost(target) {
   const owner = getUser(target.owner_id);
   const ownerOwned = owner ? ownedCount(owner.id) : 0;
-  const job = jobByKey(target.job);
-  const jobIncome = job ? job.income : 12;
-  return Math.floor(320 + jobIncome * 8 + ownerOwned * 90 + (owner ? owner.protection : 1) * 40);
-}
-
-function stealChance(attacker, target) {
-  const owner = getUser(target.owner_id);
-  const atkPower = 10 + ownedCount(attacker.id) * 4 + attacker.protection * 2;
-  const ownerPower = owner ? 10 + ownedCount(owner.id) * 6 + owner.protection * 2 : 10;
-  const raw = atkPower / (atkPower + ownerPower);
-  // slightly harder range than a normal acquire — stealing is riskier by design
-  return Math.min(0.85, Math.max(0.15, raw));
+  const timesRansomed = target.times_ransomed || 0;
+  return Math.floor(320 * Math.pow(1.15, ownerOwned) * Math.pow(1.4, timesRansomed));
 }
 
 // NOTE: protection upgrades were removed as a player-facing feature per
-// request — protection stays at whatever value a user starts with and is
-// only used internally by acquisitionCost/successChance below.
+// request, and the whole chance mechanic was later removed too — every
+// acquisition/steal now always succeeds if the attacker can pay the cost.
 
 function logEvent(userId, type, payload) {
   dbLogEvent(userId, type, payload);
@@ -276,10 +261,8 @@ module.exports = {
   collectFromPerson,
   effectiveIncome,
   acquisitionCost,
-  successChance,
   ransomCost,
   stealCost,
-  stealChance,
   logEvent,
   refreshRank,
   runRebellionTick,

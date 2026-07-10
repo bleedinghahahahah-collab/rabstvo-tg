@@ -331,7 +331,7 @@ async function loadFreeMarket() {
           method: 'POST',
           body: JSON.stringify({ targetId: p.id }),
         });
-        toast(r.success ? `Успех! Шанс был ${r.chance}%` : `Не вышло. Шанс был ${r.chance}%`);
+        toast('Захвачен!');
         loadMarket();
         loadMe();
       } catch (e) {
@@ -375,7 +375,7 @@ async function loadStealMarket() {
           method: 'POST',
           body: JSON.stringify({ targetId: p.id }),
         });
-        toast(r.success ? `Украдено! Шанс был ${r.chance}%` : `Не вышло. Шанс был ${r.chance}%`);
+        toast('Украдено!');
         loadMarket();
         loadMe();
       } catch (e) {
