@@ -353,6 +353,7 @@ document.getElementById('btn-ransom').addEventListener('click', async () => {
 // ===== Market tab =====
 // ===== Market tab: "Свободные" (free agents) / "Украсть" (steal from others) =====
 let marketMode = 'free';
+let marketSort = '';
 
 document.querySelectorAll('#market-segmented .segmented-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -366,6 +367,16 @@ document.querySelectorAll('#market-segmented .segmented-btn').forEach((btn) => {
   });
 });
 
+document.querySelectorAll('#market-sort-segmented .segmented-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.sort === marketSort) return;
+    document.querySelectorAll('#market-sort-segmented .segmented-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    marketSort = btn.dataset.sort;
+    loadMarket();
+  });
+});
+
 async function loadMarket(silent = false) {
   if (marketMode === 'free') return loadFreeMarket(silent);
   return loadStealMarket(silent);
@@ -374,7 +385,7 @@ async function loadMarket(silent = false) {
 async function loadFreeMarket(silent = false) {
   const list = document.getElementById('market-list');
   if (!silent) list.innerHTML = '<div class="empty-state">Ищем кандидатов…</div>';
-  const rows = await api('/api/market');
+  const rows = await api(`/api/market${marketSort ? `?sort=${marketSort}` : ''}`);
   if (!rows.length) {
     list.innerHTML = '<div class="empty-state">Сейчас все либо уже заняты, либо это ты сам. Загляни позже.</div>';
     return;
@@ -416,7 +427,7 @@ async function loadFreeMarket(silent = false) {
 async function loadStealMarket(silent = false) {
   const list = document.getElementById('market-list');
   if (!silent) list.innerHTML = '<div class="empty-state">Ищем чужих людей…</div>';
-  const rows = await api('/api/market/stealable');
+  const rows = await api(`/api/market/stealable${marketSort ? `?sort=${marketSort}` : ''}`);
   if (!rows.length) {
     list.innerHTML = '<div class="empty-state">Пока красть не у кого — у всех либо нет людей, либо это твои же.</div>';
     return;
@@ -482,7 +493,7 @@ async function loadPeople(silent = false) {
       <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
       <div style="min-width:0;flex:1;">
         <div class="row-name">${name}</div>
-        <div class="row-meta">${p.job_name} · ${fmt(p.job_income)}/ч</div>
+        <div class="row-meta">${p.job_name} · ${fmt(p.job_income)}/ч${p.acquired_price ? ` · куплен за ${fmt(p.acquired_price)}` : ''}</div>
       </div>
       <div class="row-value">+${fmtDec(p.pending_income)}</div>
       <div class="row-actions">

@@ -80,7 +80,7 @@ function upsertUser({ id, username, first_name, ref_by }) {
       id,
       username: username || null,
       first_name: first_name || null,
-      balance: 1000,
+      balance: 900,
       protection: 1,
       income_per_hour: 70,
       owner_id: null,
@@ -97,6 +97,7 @@ function upsertUser({ id, username, first_name, ref_by }) {
       shield_until: 0,
       tap_boost_until: 0,
       times_ransomed: 0,
+      acquired_price: 0,
       tap_upgrade_level: 0,
       last_seen: 0,
     };

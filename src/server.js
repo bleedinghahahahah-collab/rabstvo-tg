@@ -216,10 +216,12 @@ app.get('/api/me', requireAuth, (req, res) => {
 app.get('/api/market', requireAuth, (req, res) => {
   const now = Date.now();
   const me = getUser(req.userId);
-  const rows = freeUsers(req.userId, 15).filter(
+  const sort = req.query.sort === 'asc' || req.query.sort === 'desc' ? req.query.sort : null;
+  const poolSize = sort ? 60 : 15;
+  const rows = freeUsers(req.userId, poolSize).filter(
     (u) => !(u.shield_until && now < u.shield_until) && u.id !== me.owner_id
   );
-  const list = rows.map((u) => ({
+  let list = rows.map((u) => ({
     id: u.id,
     username: u.username,
     first_name: u.first_name,
@@ -227,7 +229,8 @@ app.get('/api/market', requireAuth, (req, res) => {
     owned_count: ownedCount(u.id),
     cost: acquisitionCost(u),
   }));
-  res.json(list);
+  if (sort) list.sort((a, b) => (sort === 'asc' ? a.cost - b.cost : b.cost - a.cost));
+  res.json(list.slice(0, 15));
 });
 
 // ---- POST /api/acquire { targetId } ----
@@ -252,7 +255,12 @@ app.post('/api/acquire', requireAuth, (req, res) => {
 
   // Acquisitions always succeed now — no more chance involved.
   const job = randomJob();
-  updateUser(target.id, { owner_id: attacker.id, job: job.key, income_last_claim: Math.floor(Date.now() / 1000) });
+  updateUser(target.id, {
+    owner_id: attacker.id,
+    job: job.key,
+    acquired_price: cost,
+    income_last_claim: Math.floor(Date.now() / 1000),
+  });
   logEvent(target.id, 'acquired', { by: attacker.id, job: job.key });
   refreshRank(attacker.id);
   notify(
@@ -267,10 +275,12 @@ app.post('/api/acquire', requireAuth, (req, res) => {
 app.get('/api/market/stealable', requireAuth, (req, res) => {
   const now = Date.now();
   const me = getUser(req.userId);
-  const rows = stealableUsers(req.userId, 15).filter(
+  const sort = req.query.sort === 'asc' || req.query.sort === 'desc' ? req.query.sort : null;
+  const poolSize = sort ? 60 : 15;
+  const rows = stealableUsers(req.userId, poolSize).filter(
     (u) => !(u.shield_until && now < u.shield_until) && u.id !== me.owner_id
   );
-  const list = rows.map((u) => {
+  let list = rows.map((u) => {
     const owner = getUser(u.owner_id);
     return {
       id: u.id,
@@ -280,6 +290,8 @@ app.get('/api/market/stealable', requireAuth, (req, res) => {
       cost: stealCost(u),
     };
   });
+  if (sort) list.sort((a, b) => (sort === 'asc' ? a.cost - b.cost : b.cost - a.cost));
+  list = list.slice(0, 15);
   res.json(list);
 });
 
@@ -308,7 +320,7 @@ app.post('/api/steal', requireAuth, (req, res) => {
   updateUser(attacker.id, { balance: attacker.balance - cost });
 
   // Steals always succeed now — no more chance involved.
-  updateUser(target.id, { owner_id: attacker.id }); // keeps their existing job
+  updateUser(target.id, { owner_id: attacker.id, acquired_price: cost }); // keeps their existing job
   logEvent(target.id, 'stolen', { by: attacker.id, from: oldOwnerId });
   refreshRank(attacker.id);
   if (oldOwner) refreshRank(oldOwner.id);
@@ -334,6 +346,7 @@ app.get('/api/my-people', requireAuth, (req, res) => {
         job_blurb: job ? job.blurb : 'Пока просто числится.',
         job_income: job ? job.income : 6,
         pending_income: personPendingIncome(u),
+        acquired_price: u.acquired_price || 0,
       };
     })
   );

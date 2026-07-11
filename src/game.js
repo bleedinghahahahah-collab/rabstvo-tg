@@ -4,25 +4,25 @@ const { getUser, updateUser, ownedBy, allUsers, logEvent: dbLogEvent } = require
 // its own hourly income, balanced so the average stays close to the old
 // flat rate — variety without breaking the economy. ----
 const JOBS = [
-  { key: 'toilet', name: 'Мойщик параши', income: 52, blurb: 'Драит толчки с чувством, с толком, с расстановкой.' },
-  { key: 'taxi', name: 'Таксист', income: 74, blurb: 'Возит клиентов в объезд для повышения счётчика.' },
-  { key: 'trader', name: 'Трейдер', income: 84, blurb: 'Сливает депозит с уверенным видом.' },
-  { key: 'diver', name: 'Водолаз', income: 64, blurb: 'Ищет на дне реки то, что все давно потеряли.' },
-  { key: 'lookout', name: 'Смотрящий за подъездом', income: 52, blurb: 'Следит, чтобы лифт работал хотя бы иногда.' },
-  { key: 'noodle_dealer', name: 'Барыга доширака', income: 64, blurb: 'Продаёт лапшу втридорога прямо у окна камеры.' },
-  { key: 'fortune_teller', name: 'Гадалка на кофейной гуще', income: 52, blurb: 'Предсказывает конец срока с точностью до квартала.' },
-  { key: 'ad_copywriter', name: 'Копирайтер объявлений «куплю/продам»', income: 64, blurb: 'Пишет "торг уместен" с настоящей душой.' },
-  { key: 'funeral_dj', name: 'Диджей на похоронах', income: 74, blurb: 'Ставит грустные биты за скромный гонорар.' },
-  { key: 'scrap_dealer', name: 'Скупщик металлолома', income: 74, blurb: 'Утаскивает всё, что плохо прикручено.' },
-  { key: 'bootleg_seller', name: 'Продавец пиратских дисков', income: 64, blurb: '«Держи, брат, HD-качество» — качество не гарантирует.' },
-  { key: 'mystery_courier', name: 'Курьер сомнительных посылок', income: 84, blurb: 'Не задаёт вопросов, просто доставляет.' },
-  { key: 'background_actor', name: 'Актёр массовки в сериале', income: 52, blurb: 'Играет «прохожего номер три» уже седьмой сезон.' },
-  { key: 'shawarma_owner', name: 'Владелец ларька с шаурмой', income: 94, blurb: 'Единственный, у кого доход реально стабилен.' },
-  { key: 'pigeon_keeper', name: 'Смотритель голубей', income: 42, blurb: 'Кормит птиц и втайне мечтает о лучшей жизни.' },
-  { key: 'charger_tester', name: 'Тестировщик китайских зарядок', income: 52, blurb: 'Проверяет, взорвётся или нет. Пока везёт.' },
-  { key: 'cellmate_therapist', name: 'Психолог для сокамерников', income: 64, blurb: 'Слушает всех, советует всем, платят единицы.' },
-  { key: 'crypto_evangelist', name: 'Крипто-евангелист', income: 84, blurb: 'Обещает иксы, доставляет нули.' },
-  { key: 'cat_shepherd', name: 'Пастух дворовых котов', income: 42, blurb: 'Особая порода терпения.' },
+  { key: 'toilet', name: 'Мойщик параши', income: 182, blurb: 'Драит толчки с чувством, с толком, с расстановкой.' },
+  { key: 'taxi', name: 'Таксист', income: 259, blurb: 'Возит клиентов в объезд для повышения счётчика.' },
+  { key: 'trader', name: 'Трейдер', income: 294, blurb: 'Сливает депозит с уверенным видом.' },
+  { key: 'diver', name: 'Водолаз', income: 224, blurb: 'Ищет на дне реки то, что все давно потеряли.' },
+  { key: 'lookout', name: 'Смотрящий за подъездом', income: 182, blurb: 'Следит, чтобы лифт работал хотя бы иногда.' },
+  { key: 'noodle_dealer', name: 'Барыга доширака', income: 224, blurb: 'Продаёт лапшу втридорога прямо у окна камеры.' },
+  { key: 'fortune_teller', name: 'Гадалка на кофейной гуще', income: 182, blurb: 'Предсказывает конец срока с точностью до квартала.' },
+  { key: 'ad_copywriter', name: 'Копирайтер объявлений «куплю/продам»', income: 224, blurb: 'Пишет "торг уместен" с настоящей душой.' },
+  { key: 'funeral_dj', name: 'Диджей на похоронах', income: 259, blurb: 'Ставит грустные биты за скромный гонорар.' },
+  { key: 'scrap_dealer', name: 'Скупщик металлолома', income: 259, blurb: 'Утаскивает всё, что плохо прикручено.' },
+  { key: 'bootleg_seller', name: 'Продавец пиратских дисков', income: 224, blurb: '«Держи, брат, HD-качество» — качество не гарантирует.' },
+  { key: 'mystery_courier', name: 'Курьер сомнительных посылок', income: 294, blurb: 'Не задаёт вопросов, просто доставляет.' },
+  { key: 'background_actor', name: 'Актёр массовки в сериале', income: 182, blurb: 'Играет «прохожего номер три» уже седьмой сезон.' },
+  { key: 'shawarma_owner', name: 'Владелец ларька с шаурмой', income: 329, blurb: 'Единственный, у кого доход реально стабилен.' },
+  { key: 'pigeon_keeper', name: 'Смотритель голубей', income: 147, blurb: 'Кормит птиц и втайне мечтает о лучшей жизни.' },
+  { key: 'charger_tester', name: 'Тестировщик китайских зарядок', income: 182, blurb: 'Проверяет, взорвётся или нет. Пока везёт.' },
+  { key: 'cellmate_therapist', name: 'Психолог для сокамерников', income: 224, blurb: 'Слушает всех, советует всем, платят единицы.' },
+  { key: 'crypto_evangelist', name: 'Крипто-евангелист', income: 294, blurb: 'Обещает иксы, доставляет нули.' },
+  { key: 'cat_shepherd', name: 'Пастух дворовых котов', income: 147, blurb: 'Особая порода терпения.' },
 ];
 
 function randomJob() {
@@ -83,7 +83,7 @@ function accrue(userId) {
 // last collected from them ----
 function personPendingIncome(person) {
   const job = jobByKey(person.job);
-  const rate = job ? job.income : 12;
+  const rate = job ? job.income : 42;
   const now = Math.floor(Date.now() / 1000);
   const since = person.income_last_claim || person.created_at || now;
   const elapsedHours = (now - since) / 3600;
@@ -104,7 +104,7 @@ function effectiveIncome(u) {
   const owned = ownedBy(u.id);
   const jobIncome = owned.reduce((sum, person) => {
     const job = jobByKey(person.job);
-    return sum + (job ? job.income : 12); // 12 = fallback for people acquired before jobs existed
+    return sum + (job ? job.income : 42); // 42 = fallback for people acquired before jobs existed
   }, 0);
   return u.income_per_hour + jobIncome;
 }
@@ -112,23 +112,25 @@ function effectiveIncome(u) {
 // ---- Cost to acquire a free target: 500 base + 35% of their current
 // income + how many people they already own, then +15% on top of that
 // total. No chance involved — if you can afford it, you get them. ----
+// ---- Cost to acquire a free target: 450 base, growing 15% for every
+// person they already own. No chance involved — if you can afford it, you
+// get them. ----
 function acquisitionCost(target) {
-  const income = effectiveIncome(target);
   const owned = ownedCount(target.id);
-  const sum = 500 + income * 0.35 + owned;
-  return Math.floor(sum * 1.15);
+  return Math.floor(450 * Math.pow(1.15, owned));
 }
 
-// ---- Price to buy your own freedom: you're not fighting the person
-// themselves, you're overcoming whoever currently owns them — 35% of the
-// OWNER's balance + however many people the owner already has, +15% on
-// top. A rich, well-built owner is much harder to buy your way out from. ----
+// ---- Price to buy your own freedom: the price someone actually paid to
+// acquire you (stored on you at that moment) + 10% of their balance + 180
+// per person they already own. Because part of this is a fixed historical
+// price (not just current balance), it can't be tanked to near-nothing by
+// draining balance right before a ransom attempt. ----
 function ransomCost(person) {
   const owner = getUser(person.owner_id);
   if (!owner) return 0;
   const ownerOwned = ownedCount(owner.id);
-  const sum = owner.balance * 0.35 + ownerOwned;
-  return Math.floor(sum * 1.15);
+  const pricePaid = person.acquired_price || 0;
+  return Math.floor(pricePaid + owner.balance * 0.1 + ownerOwned * 180);
 }
 
 // ---- Stealing someone who's already enslaved uses the exact same logic as
@@ -138,8 +140,8 @@ function stealCost(target) {
   const owner = getUser(target.owner_id);
   if (!owner) return 0;
   const ownerOwned = ownedCount(owner.id);
-  const sum = owner.balance * 0.35 + ownerOwned;
-  return Math.floor(sum * 1.15);
+  const pricePaid = target.acquired_price || 0;
+  return Math.floor(pricePaid + owner.balance * 0.1 + ownerOwned * 180);
 }
 
 // NOTE: protection upgrades were removed as a player-facing feature per
@@ -166,9 +168,9 @@ const FARM_MIN_INTERVAL_MS = 60; // ~16 taps/sec — comfortably covers fast two
 
 // ---- Permanent tap-value upgrade, bought with in-game coins (not Stars).
 // Each level adds +0.1 to every tap; price grows 35% per level. ----
-const TAP_UPGRADE_BASE_COST = 150;
-const TAP_UPGRADE_MULTIPLIER = 1.05;
-const TAP_UPGRADE_INCREMENT = 0.2;
+const TAP_UPGRADE_BASE_COST = 120;
+const TAP_UPGRADE_MULTIPLIER = 1.06;
+const TAP_UPGRADE_INCREMENT = 0.1;
 
 function tapUpgradeCost(level) {
   return Math.floor(TAP_UPGRADE_BASE_COST * Math.pow(TAP_UPGRADE_MULTIPLIER, level));

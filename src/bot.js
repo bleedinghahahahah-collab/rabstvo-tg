@@ -32,11 +32,12 @@ function createBot({ token, webAppUrl }) {
       if (inviter) {
         joinedViaReferral = true;
         const job = randomJob();
-        updateUser(refBy, { balance: inviter.balance + 1500 });
+        updateUser(refBy, { balance: inviter.balance + 1250 });
         updateUser(user.id, {
-          balance: 1000,
+          balance: 900,
           owner_id: refBy,
           job: job.key,
+          acquired_price: 0, // came in free via referral, not bought on the market
           income_last_claim: Math.floor(Date.now() / 1000),
         });
         logEvent(refBy, 'acquired', { person_id: user.id, via: 'referral', job: job.key });
@@ -45,7 +46,7 @@ function createBot({ token, webAppUrl }) {
 
     const kb = new InlineKeyboard().webApp('Открыть игру', webAppUrl);
     const welcomeText = joinedViaReferral
-      ? 'Добро пожаловать в подполье. Ты пришёл по приглашению — на счету уже 1000 монет для старта.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.'
+      ? 'Добро пожаловать в подполье. Ты пришёл по приглашению — на счету уже 900 монет для старта.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.'
       : 'Добро пожаловать в подполье.\n\nЗдесь ты либо строишь свою империю, либо становишься чьим-то активом. Выбирай.';
     ctx.reply(welcomeText, { reply_markup: kb });
   });
