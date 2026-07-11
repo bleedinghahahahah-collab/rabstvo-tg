@@ -89,8 +89,48 @@ function refreshOnlineCount() {
 }
 refreshRankCache();
 refreshOnlineCount();
-setInterval(refreshRankCache, 3 * 60 * 1000);
-setInterval(refreshOnlineCount, 40 * 1000);
+
+// ---- Real-time push: online count + leaderboard, via Server-Sent Events.
+// EventSource can't send custom headers, so the client passes initData as a
+// query param for this one connection — it's Telegram's own signed payload
+// (verified the same way as everywhere else), not a secret credential. ----
+const sseClients = new Set();
+
+function buildLiveSnapshot() {
+  const byBalance = topByBalance(20).map((u, i) => ({
+    rank: i + 1,
+    id: u.id,
+    username: u.username,
+    first_name: u.first_name,
+    balance: u.balance,
+    owned_count: ownedCount(u.id),
+    rank_title: rankFor(ownedCount(u.id)),
+  }));
+  const byOwned = topByOwned(ownedCount, 20).map((u, i) => ({
+    rank: i + 1,
+    id: u.id,
+    username: u.username,
+    first_name: u.first_name,
+    balance: u.balance,
+    owned_count: ownedCount(u.id),
+    rank_title: rankFor(ownedCount(u.id)),
+  }));
+  return { online: cachedOnlineCount, leaderboard_balance: byBalance, leaderboard_owned: byOwned };
+}
+
+function broadcastLive() {
+  if (sseClients.size === 0) return;
+  const payload = `data: ${JSON.stringify(buildLiveSnapshot())}\n\n`;
+  for (const client of sseClients) client.write(payload);
+}
+
+// one shared tick drives the cache AND the live broadcast — every 3s feels
+// real-time without recomputing anything per-client
+setInterval(() => {
+  refreshRankCache();
+  refreshOnlineCount();
+  broadcastLive();
+}, 3000);
 
 function requireAuth(req, res, next) {
   const initData = req.header('x-telegram-init-data');
@@ -139,6 +179,27 @@ function publicUser(u) {
     online_count: cachedOnlineCount,
   };
 }
+
+// ---- GET /api/live — Server-Sent Events stream: online count + leaderboard,
+// pushed every 3 seconds to every connected client ----
+app.get('/api/live', (req, res) => {
+  const tgUser = verifyInitData(req.query.initData, BOT_TOKEN);
+  if (!tgUser) return res.status(401).end();
+
+  upsertUser({ id: tgUser.id, username: tgUser.username, first_name: tgUser.first_name });
+  touchLastSeen(tgUser.id);
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  res.write(`data: ${JSON.stringify(buildLiveSnapshot())}\n\n`);
+  sseClients.add(res);
+  req.on('close', () => sseClients.delete(res));
+});
 
 // ---- GET /api/online — how many players are active right now ----
 app.get('/api/online', requireAuth, (req, res) => {

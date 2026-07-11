@@ -115,7 +115,7 @@ function fmtDec(n) {
 // (via the .transitioning class) for the ~280ms the animation runs.
 const TAB_ORDER = ['profile', 'market', 'people', 'farm', 'shop', 'top', 'invite'];
 const TRANSITION_MS = 300;
-let currentTab = 'profile';
+let currentTab = 'farm';
 let tabTransitionTimer = null;
 
 const tabs = document.querySelectorAll('.tab-btn');
@@ -297,14 +297,37 @@ document.getElementById('big-alert-close').addEventListener('click', () => {
   document.getElementById('big-alert').classList.remove('show');
 });
 
-// Poll periodically so status (enslaved/freed/income) and the online-now
-// count stay fresh even if the mini app is just left open in the
-// background — the mechanism behind the "ВАС ВЗЯЛИ В РАБСТВО!!!" alert
-// above. Single merged call (used to be two separate polls) to keep
-// background load low with 100-200+ concurrent players.
+// Poll periodically so status (enslaved/freed/income) stays fresh even if
+// the mini app is just left open in the background — the mechanism behind
+// the "ВАС ВЗЯЛИ В РАБСТВО!!!" alert above. The online count and leaderboard
+// are handled separately below via a live push connection instead.
 setInterval(() => {
   loadMe().catch(() => {});
 }, 10000);
+
+// ===== Real-time online count + leaderboard (Server-Sent Events) =====
+// EventSource can't send custom headers, so initData rides along as a query
+// param for this one connection — it's Telegram's own signed payload, the
+// server verifies it exactly the same way as every other request.
+if (initData && typeof EventSource !== 'undefined') {
+  const liveSource = new EventSource(`/api/live?initData=${encodeURIComponent(initData)}`);
+  liveSource.onmessage = (ev) => {
+    let payload;
+    try {
+      payload = JSON.parse(ev.data);
+    } catch {
+      return;
+    }
+    const onlineEl = document.getElementById('online-count');
+    if (onlineEl && typeof payload.online === 'number') onlineEl.textContent = fmt(payload.online);
+
+    if (currentTab === 'top') {
+      const rows = topMode === 'owned' ? payload.leaderboard_owned : payload.leaderboard_balance;
+      if (rows) renderLeaderboard(rows);
+    }
+  };
+  // EventSource reconnects automatically on drop — nothing else to do here
+}
 
 // ===== Profile tab actions =====
 document.getElementById('btn-daily').addEventListener('click', async () => {
@@ -531,17 +554,14 @@ document.querySelectorAll('#top-segmented .segmented-btn').forEach((btn) => {
   });
 });
 
-async function loadTop(silent = false) {
+function renderLeaderboard(rows) {
   const list = document.getElementById('top-list');
-  if (!silent) list.innerHTML = '<div class="empty-state">Считаем состояния…</div>';
-  const rows = await api(`/api/leaderboard?by=${topMode}`);
   list.innerHTML = '';
   rows.forEach((p) => {
     const name = p.username ? '@' + p.username : p.first_name || 'Без имени';
     const row = document.createElement('div');
     row.className = 'ledger-row';
-    const valueHtml =
-      topMode === 'owned' ? `${fmt(p.owned_count)} чел.` : `${fmt(p.balance)}`;
+    const valueHtml = topMode === 'owned' ? `${fmt(p.owned_count)} чел.` : `${fmt(p.balance)}`;
     row.innerHTML = `
       <div class="rank-badge">#${p.rank}</div>
       <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
@@ -554,6 +574,13 @@ async function loadTop(silent = false) {
     `;
     list.appendChild(row);
   });
+}
+
+async function loadTop(silent = false) {
+  const list = document.getElementById('top-list');
+  if (!silent) list.innerHTML = '<div class="empty-state">Считаем состояния…</div>';
+  const rows = await api(`/api/leaderboard?by=${topMode}`);
+  renderLeaderboard(rows);
 }
 
 // ===== Farm tab =====
@@ -813,6 +840,7 @@ document.getElementById('btn-copy-link').addEventListener('click', async () => {
 (async function boot() {
   try {
     await loadMe();
+    await loadFarmStatus();
   } catch (e) {
     toast('Открой это через кнопку в Telegram-боте');
   }
