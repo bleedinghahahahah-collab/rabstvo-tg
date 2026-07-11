@@ -983,7 +983,11 @@ main#panels {
 .casino-content {
   position: relative;
   z-index: 1;
-  padding: calc(14px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  /* Telegram floats its own fullscreen "Закрыть" pill over the top-left
+     corner. contentSafeAreaInset is supposed to account for it, but in
+     practice it under-reports on some clients — so on top of whatever
+     Telegram tells us, we always add a fixed clearance buffer as well. */
+  padding: calc(52px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) 18px calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 .casino-topbar {

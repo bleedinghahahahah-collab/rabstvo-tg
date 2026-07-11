@@ -948,6 +948,9 @@ function stopCasinoMultiplierLoop() {
   if (casinoAnimHandle != null) cancelAnimationFrame(casinoAnimHandle);
   casinoAnimHandle = null;
 }
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && casinoPhase === 'running') startCasinoMultiplierLoop();
+});
 let chainLinksBuilt = false;
 let lastToastRoundId = null;
 let currentBalance = 0; // kept in sync from loadMe() / bet / cashout responses, used by "Ва-банк" buttons
@@ -1229,8 +1232,12 @@ function renderCasinoState(state) {
 
   if (state.phase === 'running') {
     // Anchor from the server keeps the local interpolation from drifting;
-    // the rAF loop (below) owns the multiplier text every frame from here.
+    // set the text here too as a safety net (in case rAF ever stalls, e.g.
+    // a throttled background tab) — the rAF loop then takes over on top of
+    // this for smooth per-frame growth.
     casinoRunningAt = state.running_at || casinoRunningAt;
+    const el = document.getElementById('crash-multiplier');
+    if (el) el.textContent = `${state.multiplier.toFixed(2)}x`;
     startCasinoMultiplierLoop();
   } else {
     stopCasinoMultiplierLoop();
