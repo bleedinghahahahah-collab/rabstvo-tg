@@ -47,7 +47,19 @@ if (!BOT_TOKEN) {
 const bot = createBot({ token: BOT_TOKEN, webAppUrl: WEBAPP_URL });
 
 const app = express();
-app.use(compression());
+// IMPORTANT: compression buffers/gzips response chunks before sending them,
+// which is exactly why Краш/Рулетка/лидерборд felt "frozen" and only
+// updated after leaving and reopening the screen — every SSE tick was
+// sitting in a zlib buffer instead of reaching the client immediately.
+// SSE streams (paths ending in /live) must bypass compression entirely.
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.path.endsWith('/live')) return false;
+      return compression.filter(req, res);
+    },
+  })
+);
 app.use(express.json());
 app.use(
   express.static(path.join(__dirname, '..', 'public'), {
@@ -105,7 +117,14 @@ const casinoSseClients = new Set();
 function broadcastCasino() {
   if (casinoSseClients.size === 0) return;
   for (const client of casinoSseClients) {
-    client.res.write(`data: ${JSON.stringify(casino.publicState(client.userId))}\n\n`);
+    try {
+      client.res.write(`data: ${JSON.stringify(casino.publicState(client.userId))}\n\n`);
+      client.res.flush?.(); // force out immediately — see compression note above
+    } catch {
+      // client's connection is already dead; drop it rather than let one
+      // bad socket break the broadcast for everyone else on this tick
+      casinoSseClients.delete(client);
+    }
   }
 }
 setInterval(broadcastCasino, 250);
@@ -115,7 +134,12 @@ const rouletteSseClients = new Set();
 function broadcastRoulette() {
   if (rouletteSseClients.size === 0) return;
   for (const client of rouletteSseClients) {
-    client.res.write(`data: ${JSON.stringify(roulette.publicState(client.userId))}\n\n`);
+    try {
+      client.res.write(`data: ${JSON.stringify(roulette.publicState(client.userId))}\n\n`);
+      client.res.flush?.();
+    } catch {
+      rouletteSseClients.delete(client);
+    }
   }
 }
 setInterval(broadcastRoulette, 250);
@@ -145,7 +169,14 @@ function buildLiveSnapshot() {
 function broadcastLive() {
   if (sseClients.size === 0) return;
   const payload = `data: ${JSON.stringify(buildLiveSnapshot())}\n\n`;
-  for (const client of sseClients) client.write(payload);
+  for (const client of sseClients) {
+    try {
+      client.write(payload);
+      client.flush?.();
+    } catch {
+      sseClients.delete(client);
+    }
+  }
 }
 
 // one shared tick drives the cache AND the live broadcast — every 3s feels
@@ -217,10 +248,12 @@ app.get('/api/live', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // tells nginx (if it's in front) not to buffer this response
   });
   res.flushHeaders();
 
   res.write(`data: ${JSON.stringify(buildLiveSnapshot())}\n\n`);
+  res.flush?.();
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
 });
@@ -237,10 +270,12 @@ app.get('/api/casino/live', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
   });
   res.flushHeaders();
 
   res.write(`data: ${JSON.stringify(casino.publicState(tgUser.id))}\n\n`);
+  res.flush?.();
   const client = { res, userId: tgUser.id };
   casinoSseClients.add(client);
   req.on('close', () => casinoSseClients.delete(client));
@@ -278,10 +313,12 @@ app.get('/api/roulette/live', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
   });
   res.flushHeaders();
 
   res.write(`data: ${JSON.stringify(roulette.publicState(tgUser.id))}\n\n`);
+  res.flush?.();
   const client = { res, userId: tgUser.id };
   rouletteSseClients.add(client);
   req.on('close', () => rouletteSseClients.delete(client));

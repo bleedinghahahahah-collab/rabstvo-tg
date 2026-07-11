@@ -864,6 +864,8 @@ let currentBalance = 0; // kept in sync from loadMe() / bet / cashout responses,
 let rouletteSource = null;
 let rouletteWheelBuilt = false;
 let lastRouletteToastRoundId = null;
+let casinoPollTimer = null;
+let roulettePollTimer = null;
 
 // Draws the crash chain once: a row of alternating link shapes, split into
 // a left half and a right half so they can fly apart independently on crash.
@@ -995,6 +997,12 @@ function connectCasinoSSE() {
       /* ignore malformed tick */
     }
   };
+  casinoSource.onerror = () => {
+    // The browser retries automatically on a transient drop, but if it gave
+    // up entirely (readyState CLOSED), null this out so the next openCrash()
+    // actually opens a fresh connection instead of silently no-op'ing.
+    if (casinoSource && casinoSource.readyState === EventSource.CLOSED) casinoSource = null;
+  };
 }
 function disconnectCasinoSSE() {
   casinoSource?.close();
@@ -1010,12 +1018,21 @@ function openCrash() {
   tg?.BackButton?.show();
   connectCasinoSSE();
   api('/api/casino/state').then(renderCasinoState).catch(() => {});
+  // Belt-and-braces: if SSE ever gets buffered/blocked somewhere on the
+  // network path, this keeps the round from looking frozen — worst case
+  // it's a bit less "live" than the SSE stream, never fully stuck.
+  clearInterval(casinoPollTimer);
+  casinoPollTimer = setInterval(() => {
+    api('/api/casino/state').then(renderCasinoState).catch(() => {});
+  }, 1500);
 }
 function closeCrash() {
   const view = document.getElementById('casino-view');
   if (!view) return;
   view.classList.remove('show');
   disconnectCasinoSSE();
+  clearInterval(casinoPollTimer);
+  casinoPollTimer = null;
 }
 
 function renderCasinoHistory(history) {
@@ -1200,6 +1217,9 @@ function connectRouletteSSE() {
       /* ignore malformed tick */
     }
   };
+  rouletteSource.onerror = () => {
+    if (rouletteSource && rouletteSource.readyState === EventSource.CLOSED) rouletteSource = null;
+  };
 }
 function disconnectRouletteSSE() {
   rouletteSource?.close();
@@ -1215,12 +1235,18 @@ function openRoulette() {
   tg?.BackButton?.show();
   connectRouletteSSE();
   api('/api/roulette/state').then(renderRouletteState).catch(() => {});
+  clearInterval(roulettePollTimer);
+  roulettePollTimer = setInterval(() => {
+    api('/api/roulette/state').then(renderRouletteState).catch(() => {});
+  }, 1500);
 }
 function closeRoulette() {
   const view = document.getElementById('roulette-view');
   if (!view) return;
   view.classList.remove('show');
   disconnectRouletteSSE();
+  clearInterval(roulettePollTimer);
+  roulettePollTimer = null;
 }
 
 function colorLabelRu(color) {
