@@ -1,6 +1,12 @@
 const tg = window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
+try {
+  tg?.setHeaderColor?.('#0c0c0c');
+  tg?.setBackgroundColor?.('#000000');
+} catch {
+  /* older Telegram clients may not support these — safe to ignore */
+}
 
 const initData = tg?.initData || '';
 
@@ -709,22 +715,29 @@ function loadShop() {
   document.getElementById('shop-menu').style.display = 'flex';
   document.getElementById('shop-detail').style.display = 'none';
   document.querySelectorAll('#shop-detail .shop-bar').forEach((bar) => (bar.style.display = 'none'));
+  tg?.BackButton?.hide();
 }
+
+function closeShopCategory() {
+  document.getElementById('shop-menu').style.display = 'flex';
+  document.getElementById('shop-detail').style.display = 'none';
+  tg?.BackButton?.hide();
+}
+
+tg?.BackButton?.onClick(() => closeShopCategory());
 
 document.querySelectorAll('.shop-menu-btn').forEach((btn) => {
   btn.addEventListener('click', () => openShopCategory(btn.dataset.cat));
 });
 
-document.getElementById('btn-shop-back').addEventListener('click', () => {
-  document.getElementById('shop-menu').style.display = 'flex';
-  document.getElementById('shop-detail').style.display = 'none';
-});
+document.getElementById('btn-shop-back').addEventListener('click', closeShopCategory);
 
 async function openShopCategory(cat) {
   document.getElementById('shop-menu').style.display = 'none';
   document.getElementById('shop-detail').style.display = 'block';
   document.querySelectorAll('#shop-detail .shop-bar').forEach((bar) => (bar.style.display = 'none'));
   document.getElementById(`shop-bar-${cat}`).style.display = 'block';
+  tg?.BackButton?.show(); // native Telegram back button mirrors our own "← Назад"
 
   if (cat === 'farm') {
     await loadTapUpgradeStatus();
