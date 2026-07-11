@@ -166,6 +166,7 @@ let previousOwnerStatus = undefined; // undefined = not known yet (first load)
 
 async function loadMe() {
   const me = await api('/api/me');
+  document.getElementById('online-count').textContent = fmt(me.online_count);
   document.getElementById('hdr-name').textContent = me.username ? '@' + me.username : me.first_name || 'Без имени';
   document.getElementById('hdr-rank').textContent = me.rank_title;
   document.getElementById('hdr-balance').textContent = fmtDec(me.balance);
@@ -273,24 +274,14 @@ document.getElementById('big-alert-close').addEventListener('click', () => {
   document.getElementById('big-alert').classList.remove('show');
 });
 
-// Poll periodically so status (enslaved/freed/income) stays fresh even if
-// the mini app is just left open in the background — the mechanism behind
-// the "ВАС ВЗЯЛИ В РАБСТВО!!!" alert above.
+// Poll periodically so status (enslaved/freed/income) and the online-now
+// count stay fresh even if the mini app is just left open in the
+// background — the mechanism behind the "ВАС ВЗЯЛИ В РАБСТВО!!!" alert
+// above. Single merged call (used to be two separate polls) to keep
+// background load low with 100-200+ concurrent players.
 setInterval(() => {
   loadMe().catch(() => {});
-}, 8000);
-
-// ===== Online-now counter =====
-async function loadOnlineCount() {
-  try {
-    const { count } = await api('/api/online');
-    document.getElementById('online-count').textContent = fmt(count);
-  } catch {
-    /* silent — this is just a nice-to-have indicator */
-  }
-}
-loadOnlineCount();
-setInterval(loadOnlineCount, 8000);
+}, 10000);
 
 // ===== Profile tab actions =====
 document.getElementById('btn-daily').addEventListener('click', async () => {

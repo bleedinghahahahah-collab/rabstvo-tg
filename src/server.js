@@ -1,9 +1,10 @@
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
+const compression = require('compression');
 const { webhookCallback } = require('grammy');
 
-const { getUser, upsertUser, updateUser, ownedBy, freeUsers, stealableUsers, topByBalance, topByOwned, rankPosition, onlineCount } = require('./db');
+const { getUser, upsertUser, updateUser, touchLastSeen, allUsers, ownedBy, freeUsers, stealableUsers, topByBalance, topByOwned, onlineCount } = require('./db');
 const {
   accrue,
   effectiveIncome,
@@ -44,10 +45,49 @@ if (!BOT_TOKEN) {
 const bot = createBot({ token: BOT_TOKEN, webAppUrl: WEBAPP_URL });
 
 const app = express();
+app.use(compression());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(
+  express.static(path.join(__dirname, '..', 'public'), {
+    maxAge: 0,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      } else if (filePath.endsWith('.jpg') || filePath.endsWith('.png')) {
+        // images rarely change — safe to cache longer
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      } else {
+        // js/css change often during active development — always revalidate
+        // so a stale cached copy never gets stuck on someone's phone
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  })
+);
 
 // ---- auth middleware: every API call must carry Telegram's initData ----
+// ---- Cached leaderboard positions, refreshed periodically in the
+// background instead of being recalculated on every single /api/me call.
+// At 100-200 concurrent players polling every several seconds, resorting
+// the whole player list on every request adds up fast — this makes each
+// request an O(1) lookup instead. ----
+let rankCache = { balance: new Map(), owned: new Map() };
+let cachedOnlineCount = 0;
+
+function refreshRankCache() {
+  const users = allUsers();
+  const byBalance = [...users].sort((a, b) => b.balance - a.balance);
+  const byOwned = [...users].sort((a, b) => ownedCount(b.id) - ownedCount(a.id));
+  const balanceMap = new Map();
+  const ownedMap = new Map();
+  byBalance.forEach((u, i) => balanceMap.set(u.id, i + 1));
+  byOwned.forEach((u, i) => ownedMap.set(u.id, i + 1));
+  rankCache = { balance: balanceMap, owned: ownedMap };
+  cachedOnlineCount = onlineCount();
+}
+refreshRankCache();
+setInterval(refreshRankCache, 5000);
+
 function requireAuth(req, res, next) {
   const initData = req.header('x-telegram-init-data');
   const tgUser = verifyInitData(initData, BOT_TOKEN);
@@ -59,7 +99,7 @@ function requireAuth(req, res, next) {
     first_name: tgUser.first_name,
   });
   accrue(user.id);
-  updateUser(user.id, { last_seen: Date.now() });
+  touchLastSeen(user.id);
   req.userId = user.id;
   next();
 }
@@ -90,14 +130,15 @@ function publicUser(u) {
     shield_until: u.shield_until || null,
     tap_boost_active: !!(u.tap_boost_until && nowMs < u.tap_boost_until),
     tap_boost_until: u.tap_boost_until || null,
-    rank_by_balance: rankPosition(u.id, (a, b) => b.balance - a.balance),
-    rank_by_owned: rankPosition(u.id, (a, b) => ownedCount(b.id) - ownedCount(a.id)),
+    rank_by_balance: rankCache.balance.get(u.id) || allUsers().length,
+    rank_by_owned: rankCache.owned.get(u.id) || allUsers().length,
+    online_count: cachedOnlineCount,
   };
 }
 
 // ---- GET /api/online — how many players are active right now ----
 app.get('/api/online', requireAuth, (req, res) => {
-  res.json({ count: onlineCount() });
+  res.json({ count: cachedOnlineCount });
 });
 
 // ---- GET /api/me ----

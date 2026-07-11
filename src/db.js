@@ -16,21 +16,58 @@ function load() {
 }
 load();
 
+// ---- Saving: async + debounced so a burst of requests only writes to disk
+// once, and never blocks the event loop while it does. This used to be
+// `fs.writeFileSync` triggered on literally every request (because every
+// request touches `last_seen`) — under more than a couple of concurrent
+// players that synchronous full-file rewrite was stalling the whole server,
+// which is why logins were capping out at just a few people. ----
 let saveTimer = null;
+let saveInFlight = false;
+let saveAgainAfter = false;
+
 function scheduleSave() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(save, 150);
+  saveTimer = setTimeout(save, 1200);
 }
+
 function save() {
-  fs.writeFileSync(FILE, JSON.stringify(state, null, 2));
+  if (saveInFlight) {
+    saveAgainAfter = true;
+    return;
+  }
+  saveInFlight = true;
+  const snapshot = JSON.stringify(state);
+  fs.writeFile(FILE, snapshot, (err) => {
+    saveInFlight = false;
+    if (err) console.error('Failed to save data.json:', err);
+    if (saveAgainAfter) {
+      saveAgainAfter = false;
+      scheduleSave();
+    }
+  });
 }
+
+function saveSync() {
+  // only used on process shutdown, where async writes can't be awaited
+  fs.writeFileSync(FILE, JSON.stringify(state));
+}
+
 // make sure the last changes are flushed to disk when the process exits
-process.on('exit', save);
-process.on('SIGINT', () => { save(); process.exit(0); });
-process.on('SIGTERM', () => { save(); process.exit(0); });
+process.on('exit', saveSync);
+process.on('SIGINT', () => { saveSync(); process.exit(0); });
+process.on('SIGTERM', () => { saveSync(); process.exit(0); });
 
 function getUser(id) {
   return state.users[id] || null;
+}
+
+// ---- Marks a user as active without touching disk at all. Last-seen is
+// only used for the "X online now" indicator, which tolerates losing this
+// on a restart just fine — not worth a disk write on every single request. ----
+function touchLastSeen(id) {
+  const u = state.users[id];
+  if (u) u.last_seen = Date.now();
 }
 
 function upsertUser({ id, username, first_name, ref_by }) {
@@ -154,6 +191,7 @@ module.exports = {
   getUser,
   upsertUser,
   updateUser,
+  touchLastSeen,
   allUsers,
   getUserByUsername,
   ownedBy,
