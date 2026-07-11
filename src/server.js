@@ -313,7 +313,7 @@ app.post('/api/steal', requireAuth, (req, res) => {
   refreshRank(attacker.id);
   if (oldOwner) refreshRank(oldOwner.id);
   notify(target.id, `Тебя увели у прежнего владельца. Теперь ты у игрока ${displayName(attacker)}.`);
-  notify(oldOwnerId, `Твоего человека ${displayName(target)} увёл игрок ${displayName(attacker)}.`);
+  notify(oldOwnerId, `🚨 ТВОЕГО РАБА ${displayName(target)} УВЁЛ ИГРОК ${displayName(attacker)}`);
 
   res.json({ success: true, spent: cost, balance: getUser(attacker.id).balance });
 });
