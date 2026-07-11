@@ -133,12 +133,17 @@
         <button class="segmented-btn active" data-mode="free">Свободные</button>
         <button class="segmented-btn" data-mode="steal">Украсть</button>
       </div>
+      <input type="text" id="market-search" class="market-search-input" placeholder="Поиск по имени или @username" autocomplete="off" />
       <div class="segmented" id="market-sort-segmented">
-        <button class="segmented-btn active" data-sort="">По порядку</button>
-        <button class="segmented-btn" data-sort="asc">Дешевле</button>
+        <button class="segmented-btn active" data-sort="asc">Дешевле</button>
         <button class="segmented-btn" data-sort="desc">Дороже</button>
       </div>
+      <div class="market-count" id="market-count"></div>
       <div class="list" id="market-list"><div class="empty-state">Ищем кандидатов…</div></div>
+      <button class="action-btn" id="market-load-more" style="display:none;">
+        <span>Показать ещё</span>
+        <span class="btn-sub" id="market-load-more-sub"></span>
+      </button>
     </section>
 
     <section class="panel" data-panel="people">

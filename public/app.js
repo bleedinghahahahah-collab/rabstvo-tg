@@ -6,6 +6,15 @@ try {
 } catch {
   /* older Telegram clients don't support true fullscreen — expand() above still applies */
 }
+try {
+  // Without this, swiping down anywhere on the page (e.g. scrolling up
+  // inside the shop or casino lists) can accidentally minimize/close the
+  // whole Mini App. This restricts closing to the explicit collapse
+  // button in Telegram's own chrome — no more accidental swipe-closes.
+  tg?.disableVerticalSwipes?.();
+} catch {
+  /* older Telegram clients don't support this — safe to ignore */
+}
 
 // In fullscreen mode Telegram floats its own Close/menu controls over the
 // top of our content instead of pushing it down — contentSafeAreaInset
@@ -356,10 +365,14 @@ document.getElementById('btn-ransom').addEventListener('click', async () => {
   }
 });
 
-// ===== Market tab =====
 // ===== Market tab: "Свободные" (free agents) / "Украсть" (steal from others) =====
 let marketMode = 'free';
-let marketSort = '';
+let marketSort = 'asc';
+let marketSearch = '';
+let marketOffset = 0;
+let marketTotal = 0;
+const MARKET_PAGE_SIZE = 20;
+let marketSearchDebounce = null;
 
 document.querySelectorAll('#market-segmented .segmented-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -369,7 +382,7 @@ document.querySelectorAll('#market-segmented .segmented-btn').forEach((btn) => {
     marketMode = btn.dataset.mode;
     document.getElementById('market-eyebrow').textContent =
       marketMode === 'free' ? 'Свободные люди' : 'Люди с хозяином';
-    loadMarket();
+    loadMarket(true);
   });
 });
 
@@ -379,99 +392,152 @@ document.querySelectorAll('#market-sort-segmented .segmented-btn').forEach((btn)
     document.querySelectorAll('#market-sort-segmented .segmented-btn').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     marketSort = btn.dataset.sort;
-    loadMarket();
+    loadMarket(true);
   });
 });
 
-async function loadMarket(silent = false) {
-  if (marketMode === 'free') return loadFreeMarket(silent);
-  return loadStealMarket(silent);
+document.getElementById('market-search').addEventListener('input', (ev) => {
+  clearTimeout(marketSearchDebounce);
+  const value = ev.target.value;
+  marketSearchDebounce = setTimeout(() => {
+    marketSearch = value.trim();
+    loadMarket(true);
+  }, 350);
+});
+
+document.getElementById('market-load-more').addEventListener('click', async (ev) => {
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try {
+    await loadMarket(false);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function updateMarketPager() {
+  const countEl = document.getElementById('market-count');
+  const loadMoreBtn = document.getElementById('market-load-more');
+  const sub = document.getElementById('market-load-more-sub');
+  countEl.textContent = marketTotal ? `Показано ${Math.min(marketOffset, marketTotal)} из ${marketTotal}` : '';
+  const remaining = marketTotal - marketOffset;
+  if (remaining > 0) {
+    loadMoreBtn.style.display = 'flex';
+    sub.textContent = `ещё ${remaining}`;
+  } else {
+    loadMoreBtn.style.display = 'none';
+  }
 }
 
-async function loadFreeMarket(silent = false) {
+function marketQuery() {
+  const params = new URLSearchParams({ sort: marketSort, offset: String(marketOffset), limit: String(MARKET_PAGE_SIZE) });
+  if (marketSearch) params.set('search', marketSearch);
+  return params.toString();
+}
+
+// reset=true: clear the list and start over from offset 0 (new search/sort/
+// mode, or opening the tab). reset=false: append the next page ("Показать ещё").
+async function loadMarket(reset = true) {
+  if (marketMode === 'free') return loadFreeMarket(reset);
+  return loadStealMarket(reset);
+}
+
+function appendFreeMarketRow(list, p) {
+  const name = p.username ? '@' + p.username : p.first_name || 'Без имени';
+  const row = document.createElement('div');
+  row.className = 'ledger-row';
+  row.style.flexWrap = 'wrap';
+  row.innerHTML = `
+    <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
+    <div class="row-name">${name}</div>
+    <div class="row-leader"></div>
+    <div class="row-value">${fmt(p.cost)}</div>
+    <div class="row-actions">
+      <button class="mini-btn" data-id="${p.id}">Захватить</button>
+    </div>
+  `;
+  row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
+    ev.target.disabled = true;
+    try {
+      await api('/api/acquire', { method: 'POST', body: JSON.stringify({ targetId: p.id }) });
+      toast('Успешно!');
+      loadMarket(true);
+      loadMe();
+    } catch (e) {
+      toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
+      ev.target.disabled = false;
+    }
+  });
+  list.appendChild(row);
+}
+
+async function loadFreeMarket(reset) {
   const list = document.getElementById('market-list');
-  if (!silent) list.innerHTML = '<div class="empty-state">Ищем кандидатов…</div>';
-  const rows = await api(`/api/market${marketSort ? `?sort=${marketSort}` : ''}`);
-  if (!rows.length) {
-    list.innerHTML = '<div class="empty-state">Сейчас все либо уже заняты, либо это ты сам. Загляни позже.</div>';
-    return;
+  if (reset) {
+    marketOffset = 0;
+    list.innerHTML = '<div class="empty-state">Ищем кандидатов…</div>';
   }
-  list.innerHTML = '';
-  rows.forEach((p) => {
-    const name = p.username ? '@' + p.username : p.first_name || 'Без имени';
-    const row = document.createElement('div');
-    row.className = 'ledger-row';
-    row.style.flexWrap = 'wrap';
-    row.innerHTML = `
-      <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
+  const data = await api(`/api/market?${marketQuery()}`);
+  marketTotal = data.total;
+  if (reset) {
+    list.innerHTML = '';
+    if (!data.rows.length) {
+      list.innerHTML = '<div class="empty-state">Никого не нашлось — попробуй другой поиск или загляни позже.</div>';
+    }
+  }
+  data.rows.forEach((p) => appendFreeMarketRow(list, p));
+  marketOffset += data.rows.length;
+  updateMarketPager();
+}
+
+function appendStealMarketRow(list, p) {
+  const name = p.username ? '@' + p.username : p.first_name || 'Без имени';
+  const row = document.createElement('div');
+  row.className = 'ledger-row';
+  row.style.flexWrap = 'wrap';
+  row.innerHTML = `
+    <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
+    <div style="min-width:0;flex:1;">
       <div class="row-name">${name}</div>
-      <div class="row-leader"></div>
-      <div class="row-value">${fmt(p.cost)}</div>
-      <div class="row-actions">
-        <button class="mini-btn" data-id="${p.id}">Захватить</button>
-      </div>
-    `;
-    row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
-      ev.target.disabled = true;
-      try {
-        const r = await api('/api/acquire', {
-          method: 'POST',
-          body: JSON.stringify({ targetId: p.id }),
-        });
-        toast('Успешно!');
-        loadMarket(true);
-        loadMe();
-      } catch (e) {
-        toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
-        ev.target.disabled = false;
-      }
-    });
-    list.appendChild(row);
+      <div class="row-meta">у ${p.owner_name}</div>
+    </div>
+    <div class="row-value">${fmt(p.cost)}</div>
+    <div class="row-actions">
+      <button class="mini-btn danger" data-id="${p.id}">Украсть</button>
+    </div>
+  `;
+  row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
+    ev.target.disabled = true;
+    try {
+      await api('/api/steal', { method: 'POST', body: JSON.stringify({ targetId: p.id }) });
+      toast('Успешно!');
+      loadMarket(true);
+      loadMe();
+    } catch (e) {
+      toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
+      ev.target.disabled = false;
+    }
   });
+  list.appendChild(row);
 }
 
-async function loadStealMarket(silent = false) {
+async function loadStealMarket(reset) {
   const list = document.getElementById('market-list');
-  if (!silent) list.innerHTML = '<div class="empty-state">Ищем чужих людей…</div>';
-  const rows = await api(`/api/market/stealable${marketSort ? `?sort=${marketSort}` : ''}`);
-  if (!rows.length) {
-    list.innerHTML = '<div class="empty-state">Пока красть не у кого — у всех либо нет людей, либо это твои же.</div>';
-    return;
+  if (reset) {
+    marketOffset = 0;
+    list.innerHTML = '<div class="empty-state">Ищем чужих людей…</div>';
   }
-  list.innerHTML = '';
-  rows.forEach((p) => {
-    const name = p.username ? '@' + p.username : p.first_name || 'Без имени';
-    const row = document.createElement('div');
-    row.className = 'ledger-row';
-    row.style.flexWrap = 'wrap';
-    row.innerHTML = `
-      <div class="row-seal">${sealHtml(p.id, p.username || p.first_name)}</div>
-      <div style="min-width:0;flex:1;">
-        <div class="row-name">${name}</div>
-        <div class="row-meta">у ${p.owner_name}</div>
-      </div>
-      <div class="row-value">${fmt(p.cost)}</div>
-      <div class="row-actions">
-        <button class="mini-btn danger" data-id="${p.id}">Украсть</button>
-      </div>
-    `;
-    row.querySelector('.mini-btn').addEventListener('click', async (ev) => {
-      ev.target.disabled = true;
-      try {
-        const r = await api('/api/steal', {
-          method: 'POST',
-          body: JSON.stringify({ targetId: p.id }),
-        });
-        toast('Успешно!');
-        loadMarket(true);
-        loadMe();
-      } catch (e) {
-        toast(e.message + (e.cost ? ` (нужно ${e.cost})` : ''));
-        ev.target.disabled = false;
-      }
-    });
-    list.appendChild(row);
-  });
+  const data = await api(`/api/market/stealable?${marketQuery()}`);
+  marketTotal = data.total;
+  if (reset) {
+    list.innerHTML = '';
+    if (!data.rows.length) {
+      list.innerHTML = '<div class="empty-state">Пока красть не у кого — попробуй другой поиск или загляни позже.</div>';
+    }
+  }
+  data.rows.forEach((p) => appendStealMarketRow(list, p));
+  marketOffset += data.rows.length;
+  updateMarketPager();
 }
 
 // ===== My people tab =====
@@ -776,16 +842,12 @@ function loadShop() {
   document.getElementById('shop-menu').style.display = 'flex';
   document.getElementById('shop-detail').style.display = 'none';
   document.querySelectorAll('#shop-detail .shop-bar').forEach((bar) => (bar.style.display = 'none'));
-  tg?.BackButton?.hide();
 }
 
 function closeShopCategory() {
   document.getElementById('shop-menu').style.display = 'flex';
   document.getElementById('shop-detail').style.display = 'none';
-  tg?.BackButton?.hide();
 }
-
-tg?.BackButton?.onClick(() => { closeShopCategory(); handleCasinoBack(); });
 
 document.querySelectorAll('.shop-menu-btn').forEach((btn) => {
   btn.addEventListener('click', () => openShopCategory(btn.dataset.cat));
@@ -798,7 +860,6 @@ async function openShopCategory(cat) {
   document.getElementById('shop-detail').style.display = 'block';
   document.querySelectorAll('#shop-detail .shop-bar').forEach((bar) => (bar.style.display = 'none'));
   document.getElementById(`shop-bar-${cat}`).style.display = 'block';
-  tg?.BackButton?.show(); // native Telegram back button mirrors our own "← Назад"
 
   if (cat === 'farm') {
     await loadTapUpgradeStatus();
@@ -857,6 +918,36 @@ document.getElementById('btn-copy-link').addEventListener('click', async () => {
 let casinoScreen = 'closed'; // 'closed' | 'menu' | 'crash' | 'roulette'
 let casinoSource = null;
 let casinoPhase = 'waiting';
+let casinoRunningAt = null; // server timestamp the round started climbing, used to interpolate locally
+let casinoGrowthPerMs = 0.00006; // fallback; overwritten from the server's own value on first tick
+let casinoAnimHandle = null;
+
+// Same growth formula as the server (casino.js) — kept in sync via
+// growth_per_ms on every state update, so this is never a guess.
+function crashMultiplierAt(elapsedMs) {
+  if (elapsedMs <= 0) return 1.0;
+  return Math.floor(Math.pow(Math.E, casinoGrowthPerMs * elapsedMs) * 100) / 100;
+}
+
+// Runs every animation frame while the round is climbing, so the number
+// grows smoothly at 60fps instead of jumping once per SSE tick (~250ms).
+function stepCasinoMultiplier() {
+  if (casinoPhase !== 'running' || casinoRunningAt == null) {
+    casinoAnimHandle = null;
+    return;
+  }
+  const mult = crashMultiplierAt(Date.now() - casinoRunningAt);
+  const el = document.getElementById('crash-multiplier');
+  if (el) el.textContent = `${mult.toFixed(2)}x`;
+  casinoAnimHandle = requestAnimationFrame(stepCasinoMultiplier);
+}
+function startCasinoMultiplierLoop() {
+  if (casinoAnimHandle == null) casinoAnimHandle = requestAnimationFrame(stepCasinoMultiplier);
+}
+function stopCasinoMultiplierLoop() {
+  if (casinoAnimHandle != null) cancelAnimationFrame(casinoAnimHandle);
+  casinoAnimHandle = null;
+}
 let chainLinksBuilt = false;
 let lastToastRoundId = null;
 let currentBalance = 0; // kept in sync from loadMe() / bet / cashout responses, used by "Ва-банк" buttons
@@ -952,13 +1043,14 @@ function buildChipsBg(containerId) {
   }
 }
 
-// ---- Navigation: Farm → menu → (crash | roulette), with the native
-// Telegram BackButton stepping back one level at a time. ----
+// ---- Navigation: Farm → menu → (crash | roulette), entirely through our
+// own in-screen "← Назад" buttons — Telegram's native BackButton is not
+// used anywhere in this app anymore (it was rendering on top of our own
+// buttons at the top of the screen). ----
 function showCasinoMenu() {
   casinoScreen = 'menu';
   buildChipsBg('casino-menu-chips-bg');
   document.getElementById('casino-menu-view').classList.add('show');
-  tg?.BackButton?.show();
 }
 function hideCasinoMenu() {
   document.getElementById('casino-menu-view').classList.remove('show');
@@ -972,18 +1064,6 @@ function closeCasinoEntirely() {
   closeCrash();
   closeRoulette();
   casinoScreen = 'closed';
-  if (document.getElementById('shop-detail')?.style.display !== 'block') tg?.BackButton?.hide();
-}
-function handleCasinoBack() {
-  if (casinoScreen === 'crash') {
-    closeCrash();
-    showCasinoMenu();
-  } else if (casinoScreen === 'roulette') {
-    closeRoulette();
-    showCasinoMenu();
-  } else if (casinoScreen === 'menu') {
-    closeCasinoEntirely();
-  }
 }
 
 // ===== Crash =====
@@ -1015,7 +1095,6 @@ function openCrash() {
   hideCasinoMenu();
   casinoScreen = 'crash';
   document.getElementById('casino-view').classList.add('show');
-  tg?.BackButton?.show();
   connectCasinoSSE();
   api('/api/casino/state').then(renderCasinoState).catch(() => {});
   // Belt-and-braces: if SSE ever gets buffered/blocked somewhere on the
@@ -1031,6 +1110,7 @@ function closeCrash() {
   if (!view) return;
   view.classList.remove('show');
   disconnectCasinoSSE();
+  stopCasinoMultiplierLoop();
   clearInterval(casinoPollTimer);
   casinoPollTimer = null;
 }
@@ -1110,7 +1190,7 @@ function updateCasinoActionBtn(state) {
   if (state.phase === 'running') {
     if (myBet && myBet.cashed_out_at == null) {
       label.textContent = 'Забрать';
-      sub.textContent = `×${state.multiplier.toFixed(2)}`;
+      sub.textContent = `×${crashMultiplierAt(casinoRunningAt != null ? Date.now() - casinoRunningAt : 0).toFixed(2)}`;
       btn.classList.add('cashout');
       btn.onclick = cashOutCasino;
     } else if (myBet) {
@@ -1141,12 +1221,22 @@ function updateCasinoActionBtn(state) {
 
 function renderCasinoState(state) {
   casinoPhase = state.phase;
+  if (typeof state.growth_per_ms === 'number') casinoGrowthPerMs = state.growth_per_ms;
 
   const stage = document.getElementById('crash-stage');
   stage.classList.remove('phase-waiting', 'phase-running', 'phase-crashed');
   stage.classList.add(`phase-${state.phase}`);
 
-  document.getElementById('crash-multiplier').textContent = `${state.multiplier.toFixed(2)}x`;
+  if (state.phase === 'running') {
+    // Anchor from the server keeps the local interpolation from drifting;
+    // the rAF loop (below) owns the multiplier text every frame from here.
+    casinoRunningAt = state.running_at || casinoRunningAt;
+    startCasinoMultiplierLoop();
+  } else {
+    stopCasinoMultiplierLoop();
+    casinoRunningAt = null;
+    document.getElementById('crash-multiplier').textContent = `${state.multiplier.toFixed(2)}x`;
+  }
 
   const label = document.getElementById('crash-phase-label');
   if (state.phase === 'waiting') {
@@ -1232,7 +1322,6 @@ function openRoulette() {
   hideCasinoMenu();
   casinoScreen = 'roulette';
   document.getElementById('roulette-view').classList.add('show');
-  tg?.BackButton?.show();
   connectRouletteSSE();
   api('/api/roulette/state').then(renderRouletteState).catch(() => {});
   clearInterval(roulettePollTimer);
@@ -1311,7 +1400,7 @@ function updateRouletteControls(state) {
 
   buttons.forEach((btn) => {
     const color = btn.dataset.color;
-    let disabled = !isWaiting || !!byColor[color];
+    let disabled = !isWaiting;
     if (!disabled && color === 'red' && byColor.black) disabled = true;
     if (!disabled && color === 'black' && byColor.red) disabled = true;
     btn.classList.toggle('disabled-btn', disabled);

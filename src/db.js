@@ -136,25 +136,28 @@ function ownedBy(ownerId) {
   return allUsers().filter((u) => u.owner_id === ownerId);
 }
 
-function freeUsers(excludeId, limit = 15) {
-  const candidates = allUsers().filter((u) => u.owner_id === null && u.id !== excludeId);
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
-  return candidates.slice(0, limit);
+function matchesSearch(u, q) {
+  if (!q) return true;
+  const needle = q.toLowerCase();
+  return (
+    (u.username && u.username.toLowerCase().includes(needle)) ||
+    (u.first_name && u.first_name.toLowerCase().includes(needle))
+  );
+}
+
+// ---- All free (unowned) players, optionally filtered by a name/username
+// search. No shuffling or capping here anymore — server.js computes each
+// candidate's cost, sorts, and paginates, so this just returns the full
+// matching set. ----
+function freeUsers(excludeId, search) {
+  return allUsers().filter((u) => u.owner_id === null && u.id !== excludeId && matchesSearch(u, search));
 }
 
 // ---- People already owned by SOMEONE ELSE — the pool for the "steal" feature ----
-function stealableUsers(excludeId, limit = 15) {
-  const candidates = allUsers().filter(
-    (u) => u.owner_id !== null && u.owner_id !== excludeId && u.id !== excludeId
+function stealableUsers(excludeId, search) {
+  return allUsers().filter(
+    (u) => u.owner_id !== null && u.owner_id !== excludeId && u.id !== excludeId && matchesSearch(u, search)
   );
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
-  return candidates.slice(0, limit);
 }
 
 function topByBalance(limit = 20) {

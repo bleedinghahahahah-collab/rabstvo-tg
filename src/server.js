@@ -352,15 +352,21 @@ app.get('/api/me', requireAuth, (req, res) => {
 });
 
 // ---- GET /api/market: free players you could try to acquire ----
+// Supports ?search=name, ?sort=asc|desc (by cost, default asc — cheapest
+// first), and ?offset=&limit= pagination so the client can "Показать ещё"
+// instead of only ever seeing a random capped slice of the pool.
 app.get('/api/market', requireAuth, (req, res) => {
   const now = Date.now();
   const me = getUser(req.userId);
-  const sort = req.query.sort === 'asc' || req.query.sort === 'desc' ? req.query.sort : null;
-  const poolSize = sort ? 60 : 15;
-  const rows = freeUsers(req.userId, poolSize).filter(
+  const search = (req.query.search || '').trim().slice(0, 40);
+  const sort = req.query.sort === 'desc' ? 'desc' : 'asc';
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+
+  const rows = freeUsers(req.userId, search).filter(
     (u) => !(u.shield_until && now < u.shield_until) && u.id !== me.owner_id
   );
-  let list = rows.map((u) => ({
+  const list = rows.map((u) => ({
     id: u.id,
     username: u.username,
     first_name: u.first_name,
@@ -368,8 +374,9 @@ app.get('/api/market', requireAuth, (req, res) => {
     owned_count: ownedCount(u.id),
     cost: acquisitionCost(u),
   }));
-  if (sort) list.sort((a, b) => (sort === 'asc' ? a.cost - b.cost : b.cost - a.cost));
-  res.json(list.slice(0, 15));
+  list.sort((a, b) => (sort === 'asc' ? a.cost - b.cost : b.cost - a.cost));
+
+  res.json({ total: list.length, offset, limit, rows: list.slice(offset, offset + limit) });
 });
 
 // ---- POST /api/acquire { targetId } ----
@@ -414,12 +421,15 @@ app.post('/api/acquire', requireAuth, (req, res) => {
 app.get('/api/market/stealable', requireAuth, (req, res) => {
   const now = Date.now();
   const me = getUser(req.userId);
-  const sort = req.query.sort === 'asc' || req.query.sort === 'desc' ? req.query.sort : null;
-  const poolSize = sort ? 60 : 15;
-  const rows = stealableUsers(req.userId, poolSize).filter(
+  const search = (req.query.search || '').trim().slice(0, 40);
+  const sort = req.query.sort === 'desc' ? 'desc' : 'asc';
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+
+  const rows = stealableUsers(req.userId, search).filter(
     (u) => !(u.shield_until && now < u.shield_until) && u.id !== me.owner_id
   );
-  let list = rows.map((u) => {
+  const list = rows.map((u) => {
     const owner = getUser(u.owner_id);
     return {
       id: u.id,
@@ -429,9 +439,9 @@ app.get('/api/market/stealable', requireAuth, (req, res) => {
       cost: stealCost(u),
     };
   });
-  if (sort) list.sort((a, b) => (sort === 'asc' ? a.cost - b.cost : b.cost - a.cost));
-  list = list.slice(0, 15);
-  res.json(list);
+  list.sort((a, b) => (sort === 'asc' ? a.cost - b.cost : b.cost - a.cost));
+
+  res.json({ total: list.length, offset, limit, rows: list.slice(offset, offset + limit) });
 });
 
 // ---- POST /api/steal { targetId } — take someone away from their current owner ----

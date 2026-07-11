@@ -1352,3 +1352,24 @@ main#panels {
 .roulette-history-pill.red { color: #fff; background: var(--red); border-color: var(--red); }
 .roulette-history-pill.black { color: #fff; background: #1c1c1c; border-color: var(--gray-bright); }
 .roulette-history-pill.green { color: #06371f; background: var(--green); border-color: var(--green); }
+
+/* ===== Market: search + result counter ===== */
+.market-search-input {
+  width: 100%;
+  background: var(--ink-raised);
+  border: 1px solid var(--gray-line);
+  border-radius: 10px;
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 11px 12px;
+  margin-bottom: 12px;
+}
+.market-search-input::placeholder { color: var(--gray-muted); }
+.market-search-input:focus { outline: none; border-color: var(--gray-accent); }
+.market-count {
+  font-size: 11px;
+  color: var(--gray-muted);
+  text-align: right;
+  margin: -4px 2px 8px;
+}
