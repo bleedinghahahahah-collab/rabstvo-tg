@@ -31,6 +31,8 @@ const {
 const { verifyInitData } = require('./auth');
 const { createBot } = require('./bot');
 const { listShopItems, getShopItem } = require('./shop');
+const casino = require('./casino');
+const roulette = require('./roulette');
 
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -95,6 +97,28 @@ refreshOnlineCount();
 // query param for this one connection — it's Telegram's own signed payload
 // (verified the same way as everywhere else), not a secret credential. ----
 const sseClients = new Set();
+
+// ---- Casino "crash" round: separate SSE stream, since each client needs a
+// personalized snapshot (is_me / my_bet), unlike the shared leaderboard
+// payload above — so we keep {res, userId} pairs instead of just res. ----
+const casinoSseClients = new Set();
+function broadcastCasino() {
+  if (casinoSseClients.size === 0) return;
+  for (const client of casinoSseClients) {
+    client.res.write(`data: ${JSON.stringify(casino.publicState(client.userId))}\n\n`);
+  }
+}
+setInterval(broadcastCasino, 250);
+
+// ---- Roulette: same personalized-SSE pattern as the crash round above ----
+const rouletteSseClients = new Set();
+function broadcastRoulette() {
+  if (rouletteSseClients.size === 0) return;
+  for (const client of rouletteSseClients) {
+    client.res.write(`data: ${JSON.stringify(roulette.publicState(client.userId))}\n\n`);
+  }
+}
+setInterval(broadcastRoulette, 250);
 
 function buildLiveSnapshot() {
   const byBalance = topByBalance(20).map((u, i) => ({
@@ -199,6 +223,84 @@ app.get('/api/live', (req, res) => {
   res.write(`data: ${JSON.stringify(buildLiveSnapshot())}\n\n`);
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
+});
+
+// ---- GET /api/casino/live — SSE stream of the shared crash round ----
+app.get('/api/casino/live', (req, res) => {
+  const tgUser = verifyInitData(req.query.initData, BOT_TOKEN);
+  if (!tgUser) return res.status(401).end();
+
+  upsertUser({ id: tgUser.id, username: tgUser.username, first_name: tgUser.first_name });
+  touchLastSeen(tgUser.id);
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  res.write(`data: ${JSON.stringify(casino.publicState(tgUser.id))}\n\n`);
+  const client = { res, userId: tgUser.id };
+  casinoSseClients.add(client);
+  req.on('close', () => casinoSseClients.delete(client));
+});
+
+// ---- GET /api/casino/state — one-off snapshot (used on tab open, before SSE connects) ----
+app.get('/api/casino/state', requireAuth, (req, res) => {
+  res.json(casino.publicState(req.userId));
+});
+
+// ---- POST /api/casino/bet { amount } ----
+app.post('/api/casino/bet', requireAuth, (req, res) => {
+  const me = getUser(req.userId);
+  const result = casino.placeBet(req.userId, req.body.amount, { username: me.username, first_name: me.first_name });
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json(result);
+});
+
+// ---- POST /api/casino/cashout — pull out of the current round before it crashes ----
+app.post('/api/casino/cashout', requireAuth, (req, res) => {
+  const result = casino.cashOut(req.userId);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json(result);
+});
+
+// ---- GET /api/roulette/live — SSE stream of the shared roulette round ----
+app.get('/api/roulette/live', (req, res) => {
+  const tgUser = verifyInitData(req.query.initData, BOT_TOKEN);
+  if (!tgUser) return res.status(401).end();
+
+  upsertUser({ id: tgUser.id, username: tgUser.username, first_name: tgUser.first_name });
+  touchLastSeen(tgUser.id);
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  res.write(`data: ${JSON.stringify(roulette.publicState(tgUser.id))}\n\n`);
+  const client = { res, userId: tgUser.id };
+  rouletteSseClients.add(client);
+  req.on('close', () => rouletteSseClients.delete(client));
+});
+
+// ---- GET /api/roulette/state — one-off snapshot (used on tab open, before SSE connects) ----
+app.get('/api/roulette/state', requireAuth, (req, res) => {
+  res.json(roulette.publicState(req.userId));
+});
+
+// ---- POST /api/roulette/bet { color, amount } ----
+app.post('/api/roulette/bet', requireAuth, (req, res) => {
+  const me = getUser(req.userId);
+  const result = roulette.placeBet(req.userId, req.body.color, req.body.amount, {
+    username: me.username,
+    first_name: me.first_name,
+  });
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json(result);
 });
 
 // ---- GET /api/online — how many players are active right now ----

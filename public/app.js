@@ -143,6 +143,7 @@ tabs.forEach((btn) => {
     if (name === currentTab) return;
 
     finishPendingTransition(); // cancel/snap any in-flight transition first
+    if (currentTab === 'farm' && name !== 'farm') closeCasinoEntirely();
 
     tabs.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
@@ -193,6 +194,11 @@ async function loadMe() {
   document.getElementById('hdr-name').textContent = me.username ? '@' + me.username : me.first_name || 'Без имени';
   document.getElementById('hdr-rank').textContent = me.rank_title;
   document.getElementById('hdr-balance').textContent = fmtDec(me.balance);
+  currentBalance = me.balance;
+  const casinoBalanceEl = document.getElementById('casino-balance');
+  if (casinoBalanceEl) casinoBalanceEl.textContent = fmtDec(me.balance);
+  const rouletteBalanceEl = document.getElementById('roulette-balance');
+  if (rouletteBalanceEl) rouletteBalanceEl.textContent = fmtDec(me.balance);
   document.getElementById('hdr-income').textContent = fmt(me.income_per_hour) + '/ч';
   document.getElementById('hdr-owned').textContent = fmt(me.owned_count);
 
@@ -779,7 +785,7 @@ function closeShopCategory() {
   tg?.BackButton?.hide();
 }
 
-tg?.BackButton?.onClick(() => closeShopCategory());
+tg?.BackButton?.onClick(() => { closeShopCategory(); handleCasinoBack(); });
 
 document.querySelectorAll('.shop-menu-btn').forEach((btn) => {
   btn.addEventListener('click', () => openShopCategory(btn.dataset.cat));
@@ -845,6 +851,555 @@ document.getElementById('btn-copy-link').addEventListener('click', async () => {
   } catch (e) {
     toast(e.message);
   }
+});
+
+// ===== Casino: hub (menu) + shared "crash" round + shared "roulette" round =====
+let casinoScreen = 'closed'; // 'closed' | 'menu' | 'crash' | 'roulette'
+let casinoSource = null;
+let casinoPhase = 'waiting';
+let chainLinksBuilt = false;
+let lastToastRoundId = null;
+let currentBalance = 0; // kept in sync from loadMe() / bet / cashout responses, used by "Ва-банк" buttons
+
+let rouletteSource = null;
+let rouletteWheelBuilt = false;
+let lastRouletteToastRoundId = null;
+
+// Draws the crash chain once: a row of alternating link shapes, split into
+// a left half and a right half so they can fly apart independently on crash.
+function buildChainLinks() {
+  if (chainLinksBuilt) return;
+  chainLinksBuilt = true;
+  const leftGroup = document.getElementById('crash-chain-left');
+  const rightGroup = document.getElementById('crash-chain-right');
+  const totalLinks = 9;
+  const spacing = 28;
+  const startX = 160 - ((totalLinks - 1) * spacing) / 2;
+  for (let i = 0; i < totalLinks; i++) {
+    const x = startX + i * spacing;
+    const vertical = i % 2 === 1;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('class', 'chain-link');
+    rect.setAttribute('x', '-14');
+    rect.setAttribute('y', '-9');
+    rect.setAttribute('width', '28');
+    rect.setAttribute('height', '18');
+    rect.setAttribute('rx', '9');
+    rect.setAttribute('transform', `translate(${x},60) rotate(${vertical ? 90 : 0})`);
+    (i < 5 ? leftGroup : rightGroup).appendChild(rect);
+  }
+}
+
+// Draws the roulette wheel once: 21 wedges (1 green + 10 red + 10 black),
+// matching the same colour order the server uses for pockets 0..20.
+function buildRouletteWheel() {
+  if (rouletteWheelBuilt) return;
+  rouletteWheelBuilt = true;
+  const group = document.getElementById('roulette-wheel-group');
+  if (!group) return;
+  const segments = 21;
+  const cx = 100;
+  const cy = 100;
+  const r = 92;
+  const colorFor = (n) => (n === 0 ? 'var(--green)' : n % 2 === 1 ? 'var(--red)' : '#141414');
+  for (let i = 0; i < segments; i++) {
+    const startAngle = (i / segments) * 2 * Math.PI - Math.PI / 2;
+    const endAngle = ((i + 1) / segments) * 2 * Math.PI - Math.PI / 2;
+    const x1 = (cx + r * Math.cos(startAngle)).toFixed(2);
+    const y1 = (cy + r * Math.sin(startAngle)).toFixed(2);
+    const x2 = (cx + r * Math.cos(endAngle)).toFixed(2);
+    const y2 = (cy + r * Math.sin(endAngle)).toFixed(2);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${cx},${cy} L${x1},${y1} A${r},${r} 0 0,1 ${x2},${y2} Z`);
+    path.style.fill = colorFor(i);
+    path.setAttribute('stroke', '#000');
+    path.setAttribute('stroke-width', '1');
+    group.appendChild(path);
+  }
+  const hub = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  hub.setAttribute('cx', cx);
+  hub.setAttribute('cy', cy);
+  hub.setAttribute('r', '24');
+  hub.setAttribute('fill', '#111');
+  hub.setAttribute('stroke', 'var(--gold)');
+  hub.setAttribute('stroke-width', '2');
+  group.appendChild(hub);
+}
+
+// Drifting poker chips, purely decorative — built once per container, then
+// just loop forever via CSS (no per-frame JS needed). Shared by the menu
+// hub and both game screens.
+function buildChipsBg(containerId) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap || wrap.dataset.built) return;
+  wrap.dataset.built = '1';
+  const colors = ['var(--gold)', 'var(--violet)', 'var(--green)', 'var(--red)', 'var(--gray-accent)'];
+  const count = 16;
+  for (let i = 0; i < count; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'casino-chip';
+    const size = 16 + Math.random() * 26;
+    chip.style.left = `${Math.random() * 100}%`;
+    chip.style.width = `${size}px`;
+    chip.style.height = `${size}px`;
+    chip.style.setProperty('--chip-color', colors[i % colors.length]);
+    chip.style.animationDuration = `${10 + Math.random() * 9}s`;
+    chip.style.animationDelay = `-${Math.random() * 18}s`;
+    chip.style.opacity = (0.1 + Math.random() * 0.2).toFixed(2);
+    wrap.appendChild(chip);
+  }
+}
+
+// ---- Navigation: Farm → menu → (crash | roulette), with the native
+// Telegram BackButton stepping back one level at a time. ----
+function showCasinoMenu() {
+  casinoScreen = 'menu';
+  buildChipsBg('casino-menu-chips-bg');
+  document.getElementById('casino-menu-view').classList.add('show');
+  tg?.BackButton?.show();
+}
+function hideCasinoMenu() {
+  document.getElementById('casino-menu-view').classList.remove('show');
+}
+function openCasinoHub() {
+  hideCasinoMenu();
+  showCasinoMenu();
+}
+function closeCasinoEntirely() {
+  hideCasinoMenu();
+  closeCrash();
+  closeRoulette();
+  casinoScreen = 'closed';
+  if (document.getElementById('shop-detail')?.style.display !== 'block') tg?.BackButton?.hide();
+}
+function handleCasinoBack() {
+  if (casinoScreen === 'crash') {
+    closeCrash();
+    showCasinoMenu();
+  } else if (casinoScreen === 'roulette') {
+    closeRoulette();
+    showCasinoMenu();
+  } else if (casinoScreen === 'menu') {
+    closeCasinoEntirely();
+  }
+}
+
+// ===== Crash =====
+function connectCasinoSSE() {
+  if (casinoSource || !initData || typeof EventSource === 'undefined') return;
+  casinoSource = new EventSource(`/api/casino/live?initData=${encodeURIComponent(initData)}`);
+  casinoSource.onmessage = (ev) => {
+    try {
+      renderCasinoState(JSON.parse(ev.data));
+    } catch {
+      /* ignore malformed tick */
+    }
+  };
+}
+function disconnectCasinoSSE() {
+  casinoSource?.close();
+  casinoSource = null;
+}
+
+function openCrash() {
+  buildChainLinks();
+  buildChipsBg('casino-chips-bg');
+  hideCasinoMenu();
+  casinoScreen = 'crash';
+  document.getElementById('casino-view').classList.add('show');
+  tg?.BackButton?.show();
+  connectCasinoSSE();
+  api('/api/casino/state').then(renderCasinoState).catch(() => {});
+}
+function closeCrash() {
+  const view = document.getElementById('casino-view');
+  if (!view) return;
+  view.classList.remove('show');
+  disconnectCasinoSSE();
+}
+
+function renderCasinoHistory(history) {
+  const wrap = document.getElementById('crash-history');
+  wrap.innerHTML = '';
+  history.forEach((point) => {
+    const pill = document.createElement('div');
+    pill.className = 'crash-history-pill' + (point >= 2 ? ' win' : point < 1.2 ? ' bust' : '');
+    pill.textContent = `${point.toFixed(2)}x`;
+    wrap.appendChild(pill);
+  });
+}
+
+function renderCasinoBets(bets) {
+  const list = document.getElementById('crash-bets-list');
+  if (!bets.length) {
+    list.innerHTML = '<div class="empty-state">Пока никто не поставил.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  bets.forEach((b) => {
+    const row = document.createElement('div');
+    row.className =
+      'ledger-row' +
+      (b.won === true ? ' crash-bets-row-won' : b.won === false ? ' crash-bets-row-lost' : '') +
+      (b.is_me ? ' crash-bets-row-me' : '');
+
+    let outcomeHtml;
+    if (b.cashed_out_at != null) {
+      const winnings = Math.round(b.amount * b.cashed_out_at * 10) / 10;
+      outcomeHtml = `<div class="row-value">+${fmtDec(winnings)}</div><div class="row-sub">×${b.cashed_out_at.toFixed(2)}</div>`;
+    } else if (b.won === false) {
+      outcomeHtml = `<div class="row-value">−${fmt(b.amount)}</div><div class="row-sub">сгорело</div>`;
+    } else {
+      outcomeHtml = `<div class="row-value">${fmt(b.amount)}</div><div class="row-sub">в игре</div>`;
+    }
+
+    row.innerHTML = `
+      <div style="min-width:0;flex:1;">
+        <div class="row-name">${b.is_me ? 'Ты' : b.name}</div>
+        <div class="row-meta">ставка ${fmt(b.amount)}</div>
+      </div>
+      <div class="crash-bet-row-outcome">${outcomeHtml}</div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function updateCasinoActionBtn(state) {
+  const btn = document.getElementById('crash-action-btn');
+  const label = document.getElementById('crash-action-label');
+  const sub = document.getElementById('crash-action-sub');
+  const input = document.getElementById('crash-bet-amount');
+  const myBet = state.my_bet;
+
+  btn.classList.remove('cashout', 'disabled-btn');
+  btn.onclick = null;
+
+  if (state.phase === 'waiting') {
+    input.disabled = !!myBet;
+    if (myBet) {
+      label.textContent = 'Ставка принята';
+      sub.textContent = `${fmt(myBet.amount)} монет`;
+      btn.classList.add('disabled-btn');
+    } else {
+      label.textContent = 'Поставить';
+      sub.textContent = '';
+      btn.onclick = placeCasinoBet;
+    }
+    return;
+  }
+
+  input.disabled = true;
+
+  if (state.phase === 'running') {
+    if (myBet && myBet.cashed_out_at == null) {
+      label.textContent = 'Забрать';
+      sub.textContent = `×${state.multiplier.toFixed(2)}`;
+      btn.classList.add('cashout');
+      btn.onclick = cashOutCasino;
+    } else if (myBet) {
+      label.textContent = 'Забрано';
+      sub.textContent = `×${myBet.cashed_out_at.toFixed(2)}`;
+      btn.classList.add('disabled-btn');
+    } else {
+      label.textContent = 'Раунд уже идёт';
+      sub.textContent = 'жди следующего';
+      btn.classList.add('disabled-btn');
+    }
+    return;
+  }
+
+  // phase === 'crashed'
+  btn.classList.add('disabled-btn');
+  if (myBet && myBet.won) {
+    label.textContent = 'Выигрыш забран';
+    sub.textContent = `×${myBet.cashed_out_at.toFixed(2)}`;
+  } else if (myBet && myBet.won === false) {
+    label.textContent = 'Сгорело';
+    sub.textContent = `−${fmt(myBet.amount)}`;
+  } else {
+    label.textContent = 'Новый раунд скоро';
+    sub.textContent = '';
+  }
+}
+
+function renderCasinoState(state) {
+  casinoPhase = state.phase;
+
+  const stage = document.getElementById('crash-stage');
+  stage.classList.remove('phase-waiting', 'phase-running', 'phase-crashed');
+  stage.classList.add(`phase-${state.phase}`);
+
+  document.getElementById('crash-multiplier').textContent = `${state.multiplier.toFixed(2)}x`;
+
+  const label = document.getElementById('crash-phase-label');
+  if (state.phase === 'waiting') {
+    label.textContent = `Приём ставок… ${Math.ceil(state.starts_in_ms / 1000)}с`;
+  } else if (state.phase === 'running') {
+    label.textContent = 'Летит…';
+  } else {
+    label.textContent = `Лопнуло на ${state.crash_point.toFixed(2)}x`;
+  }
+
+  renderCasinoHistory(state.history);
+  renderCasinoBets(state.bets);
+  updateCasinoActionBtn(state);
+
+  if (state.phase === 'crashed' && state.my_bet && state.my_bet.won === false && lastToastRoundId !== state.round_id) {
+    toast('Не успел забрать — ставка сгорела');
+    lastToastRoundId = state.round_id;
+  }
+}
+
+async function placeCasinoBet() {
+  const btn = document.getElementById('crash-action-btn');
+  const amount = Number(document.getElementById('crash-bet-amount').value);
+  if (!amount || amount <= 0) {
+    toast('Укажи сумму ставки');
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const r = await api('/api/casino/bet', { method: 'POST', body: JSON.stringify({ amount }) });
+    document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
+    currentBalance = r.balance;
+    const casinoBalanceEl = document.getElementById('casino-balance');
+    if (casinoBalanceEl) casinoBalanceEl.textContent = fmtDec(r.balance);
+    toast('Ставка принята');
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function cashOutCasino() {
+  const btn = document.getElementById('crash-action-btn');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/casino/cashout', { method: 'POST' });
+    document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
+    currentBalance = r.balance;
+    const casinoBalanceEl = document.getElementById('casino-balance');
+    if (casinoBalanceEl) casinoBalanceEl.textContent = fmtDec(r.balance);
+    toast(`Забрано ×${r.multiplier.toFixed(2)} — +${fmtDec(r.winnings)}`);
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ===== Roulette =====
+function connectRouletteSSE() {
+  if (rouletteSource || !initData || typeof EventSource === 'undefined') return;
+  rouletteSource = new EventSource(`/api/roulette/live?initData=${encodeURIComponent(initData)}`);
+  rouletteSource.onmessage = (ev) => {
+    try {
+      renderRouletteState(JSON.parse(ev.data));
+    } catch {
+      /* ignore malformed tick */
+    }
+  };
+}
+function disconnectRouletteSSE() {
+  rouletteSource?.close();
+  rouletteSource = null;
+}
+
+function openRoulette() {
+  buildRouletteWheel();
+  buildChipsBg('roulette-chips-bg');
+  hideCasinoMenu();
+  casinoScreen = 'roulette';
+  document.getElementById('roulette-view').classList.add('show');
+  tg?.BackButton?.show();
+  connectRouletteSSE();
+  api('/api/roulette/state').then(renderRouletteState).catch(() => {});
+}
+function closeRoulette() {
+  const view = document.getElementById('roulette-view');
+  if (!view) return;
+  view.classList.remove('show');
+  disconnectRouletteSSE();
+}
+
+function colorLabelRu(color) {
+  return color === 'red' ? 'красное' : color === 'black' ? 'чёрное' : 'зелёное';
+}
+
+function renderRouletteHistory(history) {
+  const wrap = document.getElementById('roulette-history');
+  wrap.innerHTML = '';
+  history.forEach((r) => {
+    const pill = document.createElement('div');
+    pill.className = `crash-history-pill roulette-history-pill ${r.color}`;
+    pill.textContent = r.number;
+    wrap.appendChild(pill);
+  });
+}
+
+function renderRouletteBets(bets) {
+  const list = document.getElementById('roulette-bets-list');
+  if (!bets.length) {
+    list.innerHTML = '<div class="empty-state">Пока никто не поставил.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  bets.forEach((b) => {
+    const row = document.createElement('div');
+    row.className =
+      'ledger-row' +
+      (b.won === true ? ' crash-bets-row-won' : b.won === false ? ' crash-bets-row-lost' : '') +
+      (b.is_me ? ' crash-bets-row-me' : '');
+
+    let outcomeHtml;
+    if (b.won === true) {
+      outcomeHtml = `<div class="row-value">+${fmtDec(b.payout)}</div><div class="row-sub">${colorLabelRu(b.color)}</div>`;
+    } else if (b.won === false) {
+      outcomeHtml = `<div class="row-value">−${fmt(b.amount)}</div><div class="row-sub">${colorLabelRu(b.color)}</div>`;
+    } else {
+      outcomeHtml = `<div class="row-value">${fmt(b.amount)}</div><div class="row-sub">${colorLabelRu(b.color)}</div>`;
+    }
+
+    row.innerHTML = `
+      <div style="min-width:0;flex:1;">
+        <div class="row-name">${b.is_me ? 'Ты' : b.name}</div>
+        <div class="row-meta">ставка ${fmt(b.amount)}</div>
+      </div>
+      <div class="crash-bet-row-outcome">${outcomeHtml}</div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function updateRouletteControls(state) {
+  const input = document.getElementById('roulette-bet-amount');
+  const buttons = document.querySelectorAll('.roulette-color-btn');
+  const statusEl = document.getElementById('roulette-my-bet-status');
+  const myBets = state.my_bets || [];
+  const byColor = {};
+  myBets.forEach((b) => (byColor[b.color] = b));
+
+  const isWaiting = state.phase === 'waiting';
+  let anyAvailable = false;
+
+  buttons.forEach((btn) => {
+    const color = btn.dataset.color;
+    let disabled = !isWaiting || !!byColor[color];
+    if (!disabled && color === 'red' && byColor.black) disabled = true;
+    if (!disabled && color === 'black' && byColor.red) disabled = true;
+    btn.classList.toggle('disabled-btn', disabled);
+    btn.classList.toggle('selected', !!byColor[color]);
+    if (!disabled) anyAvailable = true;
+  });
+
+  input.disabled = !anyAvailable;
+
+  if (!myBets.length) {
+    statusEl.style.display = 'none';
+    return;
+  }
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = myBets
+    .map((b) => {
+      const label = colorLabelRu(b.color);
+      if (state.phase !== 'result') return `Ставка: ${fmt(b.amount)} на ${label}`;
+      if (b.won) return `Выигрыш: +${fmtDec(b.payout)} (${label})`;
+      return `Сгорело: −${fmt(b.amount)} (${label})`;
+    })
+    .join('<br>');
+}
+
+function renderRouletteState(state) {
+  const stage = document.getElementById('roulette-stage');
+  stage.classList.remove('phase-waiting', 'phase-spinning', 'phase-result');
+  stage.classList.add(`phase-${state.phase}`);
+
+  const badge = document.getElementById('roulette-result-badge');
+  const label = document.getElementById('roulette-phase-label');
+  badge.classList.remove('red', 'black', 'green');
+
+  if (state.phase === 'waiting') {
+    badge.textContent = '?';
+    label.textContent = `Приём ставок… ${Math.ceil(state.starts_in_ms / 1000)}с`;
+  } else if (state.phase === 'spinning') {
+    badge.textContent = '?';
+    label.textContent = 'Крутится…';
+  } else {
+    badge.textContent = state.result.number;
+    badge.classList.add(state.result.color);
+    label.textContent = `Выпало: ${state.result.number} · ${colorLabelRu(state.result.color)}`;
+  }
+
+  renderRouletteHistory(state.history);
+  renderRouletteBets(state.bets);
+  updateRouletteControls(state);
+
+  if (state.phase === 'result' && state.my_bets?.length && lastRouletteToastRoundId !== state.round_id) {
+    const won = state.my_bets.filter((b) => b.won);
+    const lost = state.my_bets.filter((b) => b.won === false);
+    if (won.length) {
+      const total = Math.round(won.reduce((sum, b) => sum + b.payout, 0) * 10) / 10;
+      toast(`Выигрыш +${fmtDec(total)}!`);
+    } else if (lost.length) {
+      toast('Не повезло — ставка сгорела');
+    }
+    lastRouletteToastRoundId = state.round_id;
+  }
+}
+
+document.querySelectorAll('.roulette-color-btn').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    if (btn.classList.contains('disabled-btn')) return;
+    const color = btn.dataset.color;
+    const amount = Number(document.getElementById('roulette-bet-amount').value);
+    if (!amount || amount <= 0) {
+      toast('Укажи сумму ставки');
+      return;
+    }
+    document.querySelectorAll('.roulette-color-btn').forEach((b) => (b.disabled = true));
+    try {
+      const r = await api('/api/roulette/bet', { method: 'POST', body: JSON.stringify({ color, amount }) });
+      document.getElementById('hdr-balance').textContent = fmtDec(r.balance);
+      currentBalance = r.balance;
+      const rouletteBalanceEl = document.getElementById('roulette-balance');
+      if (rouletteBalanceEl) rouletteBalanceEl.textContent = fmtDec(r.balance);
+      toast('Ставка принята');
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      document.querySelectorAll('.roulette-color-btn').forEach((b) => (b.disabled = false));
+    }
+  });
+});
+
+// ===== Shared bet-amount quick buttons (used by both Краш and Рулетка —
+// finds the input in its own row rather than a hardcoded id) =====
+document.querySelectorAll('.crash-bet-quick button').forEach((b) => {
+  b.addEventListener('click', () => {
+    const input = b.closest('.crash-bet-row')?.querySelector('.crash-bet-input');
+    if (!input || input.disabled) return;
+    if (b.id === 'crash-bet-allin' || b.id === 'roulette-bet-allin') {
+      input.value = Math.max(5, Math.floor(currentBalance));
+      return;
+    }
+    const current = Number(input.value) || 0;
+    if (b.dataset.add) input.value = current + Number(b.dataset.add);
+    if (b.dataset.mult) input.value = Math.max(5, Math.round(current * Number(b.dataset.mult)));
+  });
+});
+
+document.getElementById('btn-open-casino').addEventListener('click', openCasinoHub);
+document.getElementById('btn-casino-menu-back').addEventListener('click', closeCasinoEntirely);
+document.getElementById('casino-menu-open-crash').addEventListener('click', openCrash);
+document.getElementById('casino-menu-open-roulette').addEventListener('click', openRoulette);
+document.getElementById('btn-casino-back').addEventListener('click', () => {
+  closeCrash();
+  showCasinoMenu();
+});
+document.getElementById('btn-roulette-back').addEventListener('click', () => {
+  closeRoulette();
+  showCasinoMenu();
 });
 
 // ===== Boot =====

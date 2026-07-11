@@ -159,21 +159,38 @@
         <h2>Фарм</h2>
       </div>
 
-      <div class="farm-counter-wrap">
-        <div class="farm-counter" id="farm-counter">0 / 5000</div>
-        <div class="farm-counter-label">тапов до перерыва</div>
-      </div>
+      <div id="farm-view">
+        <div class="farm-counter-wrap">
+          <div class="farm-counter" id="farm-counter">0 / 5000</div>
+          <div class="farm-counter-label">тапов до перерыва</div>
+        </div>
 
-      <div class="farm-btn-wrap">
-        <button class="farm-btn" id="farm-btn">
-          <span id="farm-btn-label">Тапни</span>
+        <div class="farm-btn-wrap">
+          <button class="farm-btn" id="farm-btn">
+            <span id="farm-btn-label">Тапни</span>
+          </button>
+        </div>
+
+        <div class="hint-box" id="farm-lock-hint" style="display:none"></div>
+        <p class="invite-copy" style="text-align:center;margin-top:14px;" id="farm-description">
+          Каждый тап — 1 монета. После 5000 тапов — перерыв на 3 часа.
+        </p>
+
+        <button class="casino-launch-btn" id="btn-open-casino">
+          <span class="casino-launch-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="9" stroke-dasharray="3.2 3.2"/>
+              <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          <span class="casino-launch-text">
+            <span class="casino-launch-title">Казино</span>
+            <span class="casino-launch-sub">краш · рулетка</span>
+          </span>
+          <span class="casino-launch-arrow">→</span>
         </button>
       </div>
-
-      <div class="hint-box" id="farm-lock-hint" style="display:none"></div>
-      <p class="invite-copy" style="text-align:center;margin-top:14px;" id="farm-description">
-        Каждый тап — 1 монета. После 5000 тапов — перерыв на 3 часа.
-      </p>
     </section>
 
     <section class="panel" data-panel="shop">
@@ -281,6 +298,160 @@
     <button class="tab-btn" data-tab="top">Топ</button>
     <button class="tab-btn" data-tab="invite">Позвать</button>
   </nav>
+
+  <!-- ===== Casino hub: choose Краш or Рулетка ===== -->
+  <div id="casino-menu-view">
+    <div class="casino-chips-bg" id="casino-menu-chips-bg"></div>
+    <div class="casino-content">
+      <div class="casino-topbar">
+        <button class="casino-back-btn" id="btn-casino-menu-back">
+          <span class="casino-back-arrow">←</span>
+          <span class="casino-back-label">Назад</span>
+        </button>
+      </div>
+
+      <div class="casino-menu-title">Выбери игру</div>
+      <div class="casino-menu-grid">
+        <button class="casino-menu-card" id="casino-menu-open-crash">
+          <span class="casino-menu-card-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="9" stroke-dasharray="3.2 3.2"/>
+              <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          <span class="casino-menu-card-text">
+            <span class="casino-menu-card-title">Краш</span>
+            <span class="casino-menu-card-sub">общий раунд · растущий множитель</span>
+          </span>
+          <span class="casino-menu-card-arrow">→</span>
+        </button>
+
+        <button class="casino-menu-card" id="casino-menu-open-roulette">
+          <span class="casino-menu-card-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="7" r="2" fill="#E5484D" stroke="none"/>
+              <circle cx="16.5" cy="14.5" r="2" fill="#141414" stroke="currentColor" stroke-width="0.8"/>
+              <circle cx="7.5" cy="14.5" r="2" fill="#3ECF8E" stroke="none"/>
+            </svg>
+          </span>
+          <span class="casino-menu-card-text">
+            <span class="casino-menu-card-title">Рулетка</span>
+            <span class="casino-menu-card-sub">красное · чёрное · зелёное</span>
+          </span>
+          <span class="casino-menu-card-arrow">→</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Casino: standalone full-screen crash game, no header/tabbar ===== -->
+  <div id="casino-view">
+    <div class="casino-chips-bg" id="casino-chips-bg"></div>
+
+    <div class="casino-content">
+      <div class="casino-topbar">
+        <button class="casino-back-btn" id="btn-casino-back">
+          <span class="casino-back-arrow">←</span>
+          <span class="casino-back-label">Назад</span>
+        </button>
+        <span class="casino-topbar-balance"><span id="casino-balance">0</span> монет</span>
+      </div>
+
+      <div class="crash-history" id="crash-history"></div>
+
+      <div class="crash-stage" id="crash-stage">
+        <svg class="crash-chain-svg" id="crash-chain-svg" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+          <g id="crash-chain-left"></g>
+          <g id="crash-chain-right"></g>
+        </svg>
+        <div class="crash-readout">
+          <div class="crash-multiplier" id="crash-multiplier">1.00x</div>
+          <div class="crash-phase-label" id="crash-phase-label">Приём ставок…</div>
+        </div>
+      </div>
+
+      <div class="crash-bet-box">
+        <div class="crash-bet-row">
+          <input type="number" id="crash-bet-amount" class="crash-bet-input" min="5" step="5" value="50" inputmode="numeric" />
+          <div class="crash-bet-quick">
+            <button type="button" data-add="50">+50</button>
+            <button type="button" data-add="200">+200</button>
+            <button type="button" data-mult="0.5">1/2</button>
+            <button type="button" data-mult="2">x2</button>
+            <button type="button" id="crash-bet-allin">Ва-банк</button>
+          </div>
+        </div>
+        <button class="action-btn glow-btn green" id="crash-action-btn">
+          <span id="crash-action-label">Поставить</span>
+          <span class="btn-sub" id="crash-action-sub"></span>
+        </button>
+      </div>
+
+      <div class="crash-bets-label">Ставки игроков</div>
+      <div class="list" id="crash-bets-list"><div class="empty-state">Пока никто не поставил.</div></div>
+    </div>
+  </div>
+
+  <!-- ===== Roulette: standalone full-screen game, same pattern as Краш ===== -->
+  <div id="roulette-view">
+    <div class="casino-chips-bg" id="roulette-chips-bg"></div>
+
+    <div class="casino-content">
+      <div class="casino-topbar">
+        <button class="casino-back-btn" id="btn-roulette-back">
+          <span class="casino-back-arrow">←</span>
+          <span class="casino-back-label">Назад</span>
+        </button>
+        <span class="casino-topbar-balance"><span id="roulette-balance">0</span> монет</span>
+      </div>
+
+      <div class="crash-history" id="roulette-history"></div>
+
+      <div class="roulette-stage" id="roulette-stage">
+        <svg class="roulette-wheel-svg" id="roulette-wheel-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <g id="roulette-wheel-group"></g>
+        </svg>
+        <div class="roulette-readout">
+          <div class="roulette-result-badge" id="roulette-result-badge">?</div>
+          <div class="roulette-phase-label" id="roulette-phase-label">Приём ставок…</div>
+        </div>
+      </div>
+
+      <div class="crash-bet-box">
+        <div class="crash-bet-row">
+          <input type="number" id="roulette-bet-amount" class="crash-bet-input" min="5" step="5" value="50" inputmode="numeric" />
+          <div class="crash-bet-quick">
+            <button type="button" data-add="50">+50</button>
+            <button type="button" data-add="200">+200</button>
+            <button type="button" data-mult="0.5">1/2</button>
+            <button type="button" data-mult="2">x2</button>
+            <button type="button" id="roulette-bet-allin">Ва-банк</button>
+          </div>
+        </div>
+
+        <div class="roulette-color-row">
+          <button class="roulette-color-btn red" data-color="red">
+            <span class="roulette-color-name">Красное</span>
+            <span class="roulette-color-mult">×2</span>
+          </button>
+          <button class="roulette-color-btn black" data-color="black">
+            <span class="roulette-color-name">Чёрное</span>
+            <span class="roulette-color-mult">×2</span>
+          </button>
+          <button class="roulette-color-btn green" data-color="green">
+            <span class="roulette-color-name">Зелёное</span>
+            <span class="roulette-color-mult">×20</span>
+          </button>
+        </div>
+        <div class="roulette-my-bet" id="roulette-my-bet-status" style="display:none;"></div>
+      </div>
+
+      <div class="crash-bets-label">Ставки игроков</div>
+      <div class="list" id="roulette-bets-list"><div class="empty-state">Пока никто не поставил.</div></div>
+    </div>
+  </div>
 
   <div id="toast"></div>
 
