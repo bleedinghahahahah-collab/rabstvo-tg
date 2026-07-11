@@ -16,21 +16,6 @@
 
 * { box-sizing: border-box; }
 
-/* ===================================================================
-   Shimmer text — a soft light sweep runs across bright headings/values,
-   giving the whole app a subtle "alive" premium feel.
-   =================================================================== */
-.shimmer-text {
-  animation: textFlicker 4s ease-in-out infinite;
-}
-@keyframes textFlicker {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.82; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .shimmer-text { animation: none; }
-}
-
 html, body {
   margin: 0;
   padding: 0;
@@ -242,29 +227,6 @@ html, body {
 }
 
 .ledger-main { flex: 1 1 auto; min-width: 0; }
-
-.ledger-name,
-.balance-figure,
-.substat-value,
-.row-name,
-.rank-progress-current,
-.section-title h2,
-.shop-menu-title,
-.invite-hero-title {
-  animation: textFlicker 4s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .ledger-name,
-  .balance-figure,
-  .substat-value,
-  .row-name,
-  .rank-progress-current,
-  .section-title h2,
-  .shop-menu-title,
-  .invite-hero-title {
-    animation: none;
-  }
-}
 
 .ledger-name {
   font-size: 15px;

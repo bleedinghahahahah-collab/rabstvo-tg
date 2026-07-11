@@ -2,6 +2,11 @@ const tg = window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
 try {
+  tg?.requestFullscreen?.();
+} catch {
+  /* older Telegram clients don't support true fullscreen — expand() above still applies */
+}
+try {
   tg?.setHeaderColor?.('#0c0c0c');
   tg?.setBackgroundColor?.('#000000');
 } catch {
