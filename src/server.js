@@ -83,10 +83,14 @@ function refreshRankCache() {
   byBalance.forEach((u, i) => balanceMap.set(u.id, i + 1));
   byOwned.forEach((u, i) => ownedMap.set(u.id, i + 1));
   rankCache = { balance: balanceMap, owned: ownedMap };
+}
+function refreshOnlineCount() {
   cachedOnlineCount = onlineCount();
 }
 refreshRankCache();
-setInterval(refreshRankCache, 5000);
+refreshOnlineCount();
+setInterval(refreshRankCache, 3 * 60 * 1000);
+setInterval(refreshOnlineCount, 40 * 1000);
 
 function requireAuth(req, res, next) {
   const initData = req.header('x-telegram-init-data');

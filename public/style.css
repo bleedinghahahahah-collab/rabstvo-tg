@@ -169,7 +169,7 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: calc(8px + env(safe-area-inset-top)) 12px 6px;
+  padding: calc(8px + var(--tg-safe-top, env(safe-area-inset-top, 0px))) 12px 6px;
   font-size: 11.5px;
   color: var(--gray-muted);
   background: rgba(6, 6, 6, 0.9);
@@ -360,11 +360,7 @@ main#panels {
   border: 1px solid var(--gray-accent);
   border-radius: 12px;
   padding: 16px 18px;
-  background:
-    linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%),
-    var(--ink-raised);
-  background-size: 300% 300%, 100% 100%;
-  animation: glowShimmer 2.8s ease-in-out infinite;
+  background: var(--ink-raised);
   box-shadow: 0 3px 0 #000, 0 6px 10px rgba(0,0,0,0.4);
   transition: transform .12s cubic-bezier(.4,0,.2,1), box-shadow .12s cubic-bezier(.4,0,.2,1);
 }
@@ -561,11 +557,7 @@ main#panels {
 .mini-btn {
   flex: 1;
   border: 1px solid var(--gray-accent);
-  background:
-    linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%),
-    #181818;
-  background-size: 300% 300%, 100% 100%;
-  animation: glowShimmer 2.8s ease-in-out infinite;
+  background: #181818;
   color: var(--gray-bright);
   font-family: var(--font-body);
   font-weight: 600;
@@ -584,13 +576,9 @@ main#panels {
   border-color: var(--green);
   color: var(--green);
   font-weight: 700;
-  background:
-    linear-gradient(135deg, transparent 40%, rgba(62, 207, 142, 0.4) 50%, transparent 60%),
-    linear-gradient(180deg, rgba(62, 207, 142, 0.14), rgba(62, 207, 142, 0.02));
-  background-size: 300% 300%, 100% 100%;
-  animation: glowShimmer 2.4s ease-in-out infinite;
+  background: linear-gradient(180deg, rgba(62, 207, 142, 0.14), rgba(62, 207, 142, 0.02));
 }
-.mini-btn.buy:active { background: var(--green-pale); color: #cfe9db; animation: none; }
+.mini-btn.buy:active { background: var(--green-pale); color: #cfe9db; }
 .mini-btn.danger { border-color: var(--red); color: #f0a2a4; }
 .mini-btn.danger:active { background: var(--red-pale); }
 
@@ -599,11 +587,7 @@ main#panels {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background:
-    linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%),
-    #151515;
-  background-size: 300% 300%, 100% 100%;
-  animation: glowShimmer 2.8s ease-in-out infinite;
+  background: #151515;
   border: 1px solid var(--gray-line);
   color: var(--paper);
   font-family: var(--font-body);
@@ -701,15 +685,11 @@ main#panels {
 .status-badge .badge-title { color: var(--green); font-weight: 700; }
 .status-badge .badge-time { color: var(--gray-muted); font-family: var(--font-mono); font-size: 11.5px; }
 
-/* ===== Glow buttons: green (positive, shimmering) / red (danger) / dim (used up) ===== */
+/* ===== Glow buttons: green (positive) / red (danger) / dim (used up) ===== */
 .glow-btn.green,
 #btn-daily.available {
   border-color: var(--green);
-  background:
-    linear-gradient(135deg, transparent 40%, rgba(62, 207, 142, 0.35) 50%, transparent 60%),
-    linear-gradient(180deg, rgba(62, 207, 142, 0.16), rgba(62, 207, 142, 0.03));
-  background-size: 300% 300%, 100% 100%;
-  animation: glowShimmer 2.4s ease-in-out infinite;
+  background: linear-gradient(180deg, rgba(62, 207, 142, 0.16), rgba(62, 207, 142, 0.03));
 }
 .glow-btn.green .btn-sub,
 #btn-daily.available .btn-sub { color: #9beec4; }
@@ -725,12 +705,6 @@ main#panels {
   border-color: var(--gray-line) !important;
   background: #161616 !important;
   animation: none !important;
-}
-
-@keyframes glowShimmer {
-  0%   { background-position: 0% 0%, 0 0; }
-  50%  { background-position: 100% 100%, 0 0; }
-  100% { background-position: 0% 0%, 0 0; }
 }
 
 /* ===== Invite tab hero + reward cards ===== */

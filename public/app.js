@@ -6,6 +6,18 @@ try {
 } catch {
   /* older Telegram clients don't support true fullscreen — expand() above still applies */
 }
+
+// In fullscreen mode Telegram floats its own Close/menu controls over the
+// top of our content instead of pushing it down — contentSafeAreaInset
+// tells us exactly how much room to leave so our header never sits under them.
+function updateSafeAreaTop() {
+  const top = tg?.contentSafeAreaInset?.top ?? tg?.safeAreaInset?.top ?? 0;
+  document.documentElement.style.setProperty('--tg-safe-top', `${top}px`);
+}
+tg?.onEvent?.('contentSafeAreaChanged', updateSafeAreaTop);
+tg?.onEvent?.('safeAreaChanged', updateSafeAreaTop);
+tg?.onEvent?.('fullscreenChanged', updateSafeAreaTop);
+updateSafeAreaTop();
 try {
   tg?.setHeaderColor?.('#0c0c0c');
   tg?.setBackgroundColor?.('#000000');
