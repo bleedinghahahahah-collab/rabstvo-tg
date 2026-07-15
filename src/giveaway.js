@@ -9,6 +9,8 @@ const { getUser, updateUser, issueGiveawaySerial } = require('./db');
 // ===================================================================
 const GIVEAWAY_MIN_INVITES = 3;
 const GIVEAWAY_TITLE = 'РОЗЫГРЫШ 1000 ЗВЁЗД';
+const GIVEAWAY_REMINDER_TEXT =
+  '🎟 Напоминаем: в «Подполье» идёт розыгрыш 1000 звёзд.\n\nЗатащи 3 человек в дело — участвуешь. Больше людей — больше шансов, лимита нет.\n\nПроверить свой прогресс: вкладка «Позвать».';
 
 function giveawayStatus(user) {
   const invites = user.giveaway_invites || 0;
@@ -34,4 +36,4 @@ function recordGiveawayInvite(inviterId) {
   return { serial, invites, qualified: invites >= GIVEAWAY_MIN_INVITES };
 }
 
-module.exports = { GIVEAWAY_MIN_INVITES, GIVEAWAY_TITLE, giveawayStatus, recordGiveawayInvite };
+module.exports = { GIVEAWAY_MIN_INVITES, GIVEAWAY_TITLE, GIVEAWAY_REMINDER_TEXT, giveawayStatus, recordGiveawayInvite };

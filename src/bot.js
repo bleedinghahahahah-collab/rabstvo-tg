@@ -1,8 +1,11 @@
-const { Bot, InlineKeyboard } = require('grammy');
-const { upsertUser, getUser, updateUser, getUserByUsername } = require('./db');
+const path = require('path');
+const { Bot, InlineKeyboard, InputFile } = require('grammy');
+const { upsertUser, getUser, updateUser, getUserByUsername, allUsers } = require('./db');
 const { logEvent, randomJob } = require('./game');
 const { getShopItem, applyPurchase } = require('./shop');
-const { recordGiveawayInvite } = require('./giveaway');
+const { recordGiveawayInvite, GIVEAWAY_REMINDER_TEXT } = require('./giveaway');
+
+const GIVEAWAY_REMINDER_IMAGE = path.join(__dirname, '..', 'public', 'assets', 'giveaway-square.jpg');
 
 function displayName(u) {
   return u.username ? '@' + u.username : u.first_name || `ID ${u.id}`;
@@ -20,6 +23,31 @@ function getAdminIds() {
     .split(',')
     .map(Number)
     .filter(Number.isFinite);
+}
+
+// Same "Открыть игру"-style WebApp button as /start, just labeled for this
+// message — lets someone jump straight into the Mini App from the reminder
+// instead of having to go dig up the bot chat first. Sent as a photo (the
+// square banner art) with the reminder as its caption, rather than plain
+// text. Sends to everyone with a small delay between messages — Telegram's
+// Bot API rate-limits bulk sends, and this keeps well under that (~20/s)
+// without needing a queueing library for what's at most a once-a-day (or
+// manually triggered) job. Used both by the scheduled 12:00 MSK tick
+// (server.js) and the /broadcast admin command below, so there's exactly
+// one place this logic lives.
+async function broadcastGiveawayReminder(bot, webAppUrl) {
+  const keyboard = new InlineKeyboard().webApp('ПОДПОЛЬЕ', webAppUrl);
+  const users = allUsers();
+  for (const u of users) {
+    // A fresh InputFile per send — it wraps a lazily-opened read stream,
+    // so reusing one instance across many sendPhoto calls isn't safe.
+    const photo = new InputFile(GIVEAWAY_REMINDER_IMAGE);
+    bot.api.sendPhoto(u.id, photo, { caption: GIVEAWAY_REMINDER_TEXT, reply_markup: keyboard }).catch(() => {
+      /* user may have blocked the bot, or never opened a DM with it — ignore */
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return users.length;
 }
 
 function createBot({ token, webAppUrl }) {
@@ -165,7 +193,20 @@ function createBot({ token, webAppUrl }) {
     ctx.reply(`Готово: ${name} теперь ${getUser(user.id).balance} монет (${amount >= 0 ? '+' : ''}${amount}).`);
   });
 
+  // ---- /broadcast — admin-only, manually fires the same giveaway-reminder
+  // DM blast that otherwise goes out automatically at 12:00 MSK (see
+  // checkGiveawayReminderTick in server.js). Doesn't touch that daily
+  // schedule or its dedup flag — this is just an on-demand extra send. ----
+  bot.command('broadcast', async (ctx) => {
+    if (!getAdminIds().includes(ctx.from.id)) return; // silently ignore everyone else
+
+    const total = allUsers().length;
+    await ctx.reply(`Запускаю рассылку про розыгрыш — получателей: ${total}. Разошлю с паузами, это займёт около ${Math.ceil((total * 50) / 1000)} сек.`);
+    const sent = await broadcastGiveawayReminder(bot, webAppUrl);
+    ctx.reply(`Готово: рассылка отправлена ${sent} игрокам (кто заблокировал бота — пропущен молча).`);
+  });
+
   return bot;
 }
 
-module.exports = { createBot, getAdminIds };
+module.exports = { createBot, getAdminIds, broadcastGiveawayReminder };

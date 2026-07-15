@@ -31,7 +31,7 @@ const {
   tryWhip,
 } = require('./game');
 const { verifyInitData } = require('./auth');
-const { createBot, getAdminIds } = require('./bot');
+const { createBot, getAdminIds, broadcastGiveawayReminder } = require('./bot');
 const { listShopItems, getShopItem } = require('./shop');
 const { giveawayStatus } = require('./giveaway');
 const casino = require('./casino');
@@ -127,6 +127,39 @@ function checkDailyOnlinePeakRollover() {
   }
 }
 
+// ---- Daily giveaway reminder: DM broadcast to every registered player,
+// once a day at 12:00 Moscow time. The actual send (with the "ПОДПОЛЬЕ"
+// WebApp button) lives in bot.js as broadcastGiveawayReminder, shared with
+// the /broadcast admin command so there's one implementation either way
+// this gets triggered. Dedup here is the same lightweight in-memory
+// pattern as the online-peak report above (checked on the same 3s tick,
+// via Intl's Europe/Moscow timezone so it's correct regardless of what
+// timezone the server itself runs in) — a restart exactly at noon could
+// in theory double-send, an acceptable trade-off for a low-stakes daily
+// promo rather than pulling in a persisted-state or cron dependency. ----
+let lastGiveawayReminderDate = null;
+
+function moscowTimeParts() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Moscow',
+    hour: '2-digit',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const map = {};
+  for (const p of parts) map[p.type] = p.value;
+  return { hour: Number(map.hour), dateStr: `${map.year}-${map.month}-${map.day}` };
+}
+
+function checkGiveawayReminderTick() {
+  const { hour, dateStr } = moscowTimeParts();
+  if (hour !== 12 || lastGiveawayReminderDate === dateStr) return;
+  lastGiveawayReminderDate = dateStr;
+  broadcastGiveawayReminder(bot, WEBAPP_URL);
+}
+
 // ---- Real-time push: online count + leaderboard, via Server-Sent Events.
 // EventSource can't send custom headers, so the client passes initData as a
 // query param for this one connection — it's Telegram's own signed payload
@@ -211,6 +244,7 @@ setInterval(() => {
   refreshOnlineCount();
   broadcastLive();
   checkDailyOnlinePeakRollover();
+  checkGiveawayReminderTick();
 }, 3000);
 
 function requireAuth(req, res, next) {
