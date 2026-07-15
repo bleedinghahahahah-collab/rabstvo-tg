@@ -1,0 +1,370 @@
+const { getUser, updateUser, ownedBy, allUsers, logEvent: dbLogEvent } = require('./db');
+
+// ---- Jobs: assigned to a person the moment they're acquired. Each job has
+// its own hourly income, balanced so the average stays close to the old
+// flat rate — variety without breaking the economy. ----
+const JOBS = [
+  { key: 'toilet', name: 'Мойщик параши', income: 182, blurb: 'Драит толчки с чувством, с толком, с расстановкой.' },
+  { key: 'taxi', name: 'Таксист', income: 259, blurb: 'Возит клиентов в объезд для повышения счётчика.' },
+  { key: 'trader', name: 'Трейдер', income: 294, blurb: 'Сливает депозит с уверенным видом.' },
+  { key: 'diver', name: 'Водолаз', income: 224, blurb: 'Ищет на дне реки то, что все давно потеряли.' },
+  { key: 'lookout', name: 'Смотрящий за подъездом', income: 182, blurb: 'Следит, чтобы лифт работал хотя бы иногда.' },
+  { key: 'noodle_dealer', name: 'Барыга доширака', income: 224, blurb: 'Продаёт лапшу втридорога прямо у окна камеры.' },
+  { key: 'fortune_teller', name: 'Гадалка на кофейной гуще', income: 182, blurb: 'Предсказывает конец срока с точностью до квартала.' },
+  { key: 'ad_copywriter', name: 'Копирайтер объявлений «куплю/продам»', income: 224, blurb: 'Пишет "торг уместен" с настоящей душой.' },
+  { key: 'funeral_dj', name: 'Диджей на похоронах', income: 259, blurb: 'Ставит грустные биты за скромный гонорар.' },
+  { key: 'scrap_dealer', name: 'Скупщик металлолома', income: 259, blurb: 'Утаскивает всё, что плохо прикручено.' },
+  { key: 'bootleg_seller', name: 'Продавец пиратских дисков', income: 224, blurb: '«Держи, брат, HD-качество» — качество не гарантирует.' },
+  { key: 'mystery_courier', name: 'Курьер сомнительных посылок', income: 294, blurb: 'Не задаёт вопросов, просто доставляет.' },
+  { key: 'background_actor', name: 'Актёр массовки в сериале', income: 182, blurb: 'Играет «прохожего номер три» уже седьмой сезон.' },
+  { key: 'shawarma_owner', name: 'Владелец ларька с шаурмой', income: 329, blurb: 'Единственный, у кого доход реально стабилен.' },
+  { key: 'pigeon_keeper', name: 'Смотритель голубей', income: 147, blurb: 'Кормит птиц и втайне мечтает о лучшей жизни.' },
+  { key: 'charger_tester', name: 'Тестировщик китайских зарядок', income: 182, blurb: 'Проверяет, взорвётся или нет. Пока везёт.' },
+  { key: 'cellmate_therapist', name: 'Психолог для сокамерников', income: 224, blurb: 'Слушает всех, советует всем, платят единицы.' },
+  { key: 'crypto_evangelist', name: 'Крипто-евангелист', income: 294, blurb: 'Обещает иксы, доставляет нули.' },
+  { key: 'cat_shepherd', name: 'Пастух дворовых котов', income: 147, blurb: 'Особая порода терпения.' },
+];
+
+function randomJob() {
+  return JOBS[Math.floor(Math.random() * JOBS.length)];
+}
+
+function jobByKey(key) {
+  return JOBS.find((j) => j.key === key) || null;
+}
+
+// ---- Ranks: purely cosmetic titles unlocked by number of people owned ----
+const RANKS = [
+  { min: 0, title: 'Прохожий' },
+  { min: 4, title: 'Вербовщик' },
+  { min: 8, title: 'Сутенер' },
+  { min: 13, title: 'Кингман' },
+  { min: 16, title: 'Барон' },
+  { min: 21, title: 'Авторитет' },
+  { min: 26, title: 'Крестный' },
+  { min: 31, title: 'Повелитель' },
+];
+
+function rankFor(count) {
+  let title = RANKS[0].title;
+  for (const r of RANKS) if (count >= r.min) title = r.title;
+  return title;
+}
+
+// ---- How far a player is from their next title, for a profile progress bar ----
+function nextRankInfo(count) {
+  for (const r of RANKS) {
+    if (count < r.min) return { title: r.title, remaining: r.min - count, needed: r.min };
+  }
+  return null; // already at the top rank
+}
+
+function ownedCount(userId) {
+  return ownedBy(userId).length;
+}
+
+// ---- Passive income accrual: called whenever we read a user's balance ----
+// ---- Passive income accrual: only the player's OWN base income accrues
+// automatically. Income from owned people's jobs must be collected by hand
+// via the "Забрать доход" button — see personPendingIncome / collectFromPerson. ----
+function accrue(userId) {
+  const u = getUser(userId);
+  if (!u) return;
+  const now = Math.floor(Date.now() / 1000);
+  const elapsedHours = (now - u.last_claim) / 3600;
+  if (elapsedHours <= 0) return;
+  const gained = Math.floor(elapsedHours * u.income_per_hour);
+  if (gained > 0) {
+    updateUser(userId, { balance: u.balance + gained, last_claim: now });
+  }
+}
+
+// ---- How much a specific owned person has accumulated since the owner
+// last collected from them ----
+function personPendingIncome(person) {
+  const job = jobByKey(person.job);
+  const rate = job ? job.income : 42;
+  const now = Math.floor(Date.now() / 1000);
+  const since = person.income_last_claim || person.created_at || now;
+  const elapsedHours = (now - since) / 3600;
+  if (elapsedHours <= 0) return 0;
+  return Math.round(elapsedHours * rate * 10) / 10;
+}
+
+// ---- Owner collects the pending income from one specific owned person ----
+function collectFromPerson(person) {
+  const gained = personPendingIncome(person);
+  if (gained > 0) {
+    updateUser(person.id, { income_last_claim: Math.floor(Date.now() / 1000) });
+  }
+  return gained;
+}
+
+function effectiveIncome(u) {
+  const owned = ownedBy(u.id);
+  const jobIncome = owned.reduce((sum, person) => {
+    const job = jobByKey(person.job);
+    return sum + (job ? job.income : 42); // 42 = fallback for people acquired before jobs existed
+  }, 0);
+  return u.income_per_hour + jobIncome;
+}
+
+// ---- Cost to acquire a free target: 500 base + 35% of their current
+// income + how many people they already own, then +15% on top of that
+// total. No chance involved — if you can afford it, you get them. ----
+// ---- Cost to acquire a free target: 450 base, growing 15% for every
+// person they already own. No chance involved — if you can afford it, you
+// get them. ----
+function acquisitionCost(target) {
+  const owned = ownedCount(target.id);
+  return Math.floor(450 * Math.pow(1.15, owned));
+}
+
+// ---- Price to buy your own freedom (also used for stealing someone away
+// from their current owner — overcoming an owner's grip is the same problem
+// either way, whether it's the person themself buying out or someone else
+// poaching them): the price someone actually paid to acquire you (stored on
+// you at that moment) + 10% of their balance + 180 per person they already
+// own. Because part of this is a fixed historical price (not just current
+// balance), it can't be tanked to near-nothing by draining balance right
+// before a ransom attempt.
+//
+// FIX: the wealth term (10% of owner.balance) used to be uncapped, so a rich
+// player who cheaply enslaved a newbie (e.g. paid ~450 for them) could leave
+// them facing a ransom in the tens of thousands — tied to the OWNER'S ENTIRE
+// FORTUNE rather than what the relationship itself was worth, making freedom
+// effectively unreachable for a newbie starting with 900 coins. Now capped
+// at a multiple of what was actually paid for THAT person, so the price of
+// freedom always stays tied to the acquisition, not the owner's net worth. ----
+function breakFreeCost(person) {
+  const owner = getUser(person.owner_id);
+  if (!owner) return 0;
+  const ownerOwned = ownedCount(owner.id);
+  const pricePaid = person.acquired_price || 0;
+  const raw = pricePaid + owner.balance * 0.1 + ownerOwned * 180;
+  const cap = pricePaid * 5 + 500;
+  return Math.floor(Math.min(raw, cap));
+}
+
+function ransomCost(person) {
+  return breakFreeCost(person);
+}
+
+function stealCost(target) {
+  return breakFreeCost(target);
+}
+
+// NOTE: protection upgrades were removed as a player-facing feature per
+// request, and the whole chance mechanic was later removed too — every
+// acquisition/steal now always succeeds if the attacker can pay the cost.
+
+function logEvent(userId, type, payload) {
+  dbLogEvent(userId, type, payload);
+}
+
+function refreshRank(userId) {
+  const count = ownedCount(userId);
+  updateUser(userId, { rank_title: rankFor(count) });
+}
+
+// ===================================================================
+// Farm: tap-to-earn. 0.2 coins per tap, max 4 taps/sec, 5000 taps then a
+// 3-hour cooldown before the counter resets.
+// ===================================================================
+const FARM_REWARD = 1;
+const FARM_TAP_LIMIT = 5000;
+const FARM_COOLDOWN_MS = 3 * 60 * 60 * 1000;
+const FARM_MIN_INTERVAL_MS = 60; // ~16 taps/sec — comfortably covers fast two-finger tapping
+
+// ---- Permanent tap-value upgrade, bought with in-game coins (not Stars).
+// Each level adds +0.1 to every tap; price grows 35% per level. ----
+const TAP_UPGRADE_BASE_COST = 120;
+const TAP_UPGRADE_MULTIPLIER = 1.06;
+const TAP_UPGRADE_INCREMENT = 0.1;
+
+function tapUpgradeCost(level) {
+  return Math.floor(TAP_UPGRADE_BASE_COST * Math.pow(TAP_UPGRADE_MULTIPLIER, level));
+}
+
+function baseTapValue(user) {
+  return FARM_REWARD + (user.tap_upgrade_level || 0) * TAP_UPGRADE_INCREMENT;
+}
+
+// ---- Buy one level of the permanent tap upgrade with coins ----
+function tryBuyTapUpgrade(userId) {
+  const u = getUser(userId);
+  if (!u) return { ok: false, error: 'not_found' };
+  const level = u.tap_upgrade_level || 0;
+  const cost = tapUpgradeCost(level);
+  if (u.balance < cost) return { ok: false, error: 'not_enough', cost };
+
+  const newLevel = level + 1;
+  updateUser(userId, { balance: Math.round((u.balance - cost) * 10) / 10, tap_upgrade_level: newLevel });
+  return {
+    ok: true,
+    level: newLevel,
+    tap_value: Math.round(baseTapValue(getUser(userId)) * 100) / 100,
+    next_cost: tapUpgradeCost(newLevel),
+    balance: getUser(userId).balance,
+  };
+}
+
+function farmStatus(user) {
+  const now = Date.now();
+  if (user.farm_cooldown_until && now >= user.farm_cooldown_until) {
+    // cooldown already expired naturally — caller should reset via farmResetIfExpired
+    return { locked: false, taps_used: 0, taps_limit: FARM_TAP_LIMIT, unlock_at: null };
+  }
+  if (user.farm_cooldown_until && now < user.farm_cooldown_until) {
+    return { locked: true, taps_used: user.farm_taps, taps_limit: FARM_TAP_LIMIT, unlock_at: user.farm_cooldown_until };
+  }
+  return { locked: false, taps_used: user.farm_taps || 0, taps_limit: FARM_TAP_LIMIT, unlock_at: null };
+}
+
+function farmResetIfExpired(userId) {
+  const u = getUser(userId);
+  if (!u) return;
+  if (u.farm_cooldown_until && Date.now() >= u.farm_cooldown_until) {
+    updateUser(userId, { farm_taps: 0, farm_cooldown_until: 0 });
+  }
+}
+
+// Returns { ok:true, reward, balance, taps_used, taps_remaining }
+// or { ok:false, error:'too_fast' | 'locked', unlock_at? }
+function tryFarmTap(userId) {
+  farmResetIfExpired(userId);
+  const u = getUser(userId);
+  if (!u) return { ok: false, error: 'not_found' };
+
+  if (u.farm_cooldown_until && Date.now() < u.farm_cooldown_until) {
+    return { ok: false, error: 'locked', unlock_at: u.farm_cooldown_until };
+  }
+
+  const now = Date.now();
+  if (u.farm_last_tap && now - u.farm_last_tap < FARM_MIN_INTERVAL_MS) {
+    return { ok: false, error: 'too_fast' };
+  }
+
+  const newTaps = (u.farm_taps || 0) + 1;
+  const boosted = u.tap_boost_until && now < u.tap_boost_until;
+  const base = baseTapValue(u);
+  const reward = Math.round((boosted ? base * 2 : base) * 10) / 10;
+  const newBalance = Math.round((u.balance + reward) * 10) / 10;
+  const patch = { balance: newBalance, farm_taps: newTaps, farm_last_tap: now };
+
+  if (newTaps >= FARM_TAP_LIMIT) {
+    patch.farm_cooldown_until = now + FARM_COOLDOWN_MS;
+  }
+
+  updateUser(userId, patch);
+
+  return {
+    ok: true,
+    reward,
+    boosted,
+    balance: newBalance,
+    taps_used: newTaps,
+    taps_remaining: Math.max(0, FARM_TAP_LIMIT - newTaps),
+    locked: newTaps >= FARM_TAP_LIMIT,
+    unlock_at: newTaps >= FARM_TAP_LIMIT ? patch.farm_cooldown_until : null,
+  };
+}
+
+// ===================================================================
+// Coin-purchasable shield: same shield_until field the Stars shop item
+// uses (24h for Stars), but a cheaper/shorter version paid with in-game
+// coins instead of real money — lives in the "free" (coins-only) shop.
+// ===================================================================
+const COIN_SHIELD_COST = 5000;
+const COIN_SHIELD_DURATION_MS = 60 * 60 * 1000; // 1 hour
+
+function coinShieldStatus(user) {
+  const now = Date.now();
+  const active = !!(user.shield_until && now < user.shield_until);
+  return { active, shield_until: active ? user.shield_until : null, cost: COIN_SHIELD_COST };
+}
+
+function tryBuyCoinShield(userId) {
+  const u = getUser(userId);
+  if (!u) return { ok: false, error: 'not_found' };
+  const now = Date.now();
+  if (u.shield_until && now < u.shield_until) {
+    return { ok: false, error: 'already_active', shield_until: u.shield_until };
+  }
+  if (u.balance < COIN_SHIELD_COST) return { ok: false, error: 'not_enough', cost: COIN_SHIELD_COST };
+
+  const shieldUntil = now + COIN_SHIELD_DURATION_MS;
+  updateUser(userId, { balance: Math.round((u.balance - COIN_SHIELD_COST) * 10) / 10, shield_until: shieldUntil });
+  return { ok: true, shield_until: shieldUntil, balance: getUser(userId).balance };
+}
+
+// ===================================================================
+// "Whip" — a purely social/fun action an owner can trigger on someone they
+// own. No economic effect, just a bot notification to the person, with a
+// 5-minute cooldown per owned person so it can't be spammed.
+// ===================================================================
+const WHIP_COOLDOWN_MS = 5 * 60 * 1000;
+
+function tryWhip(ownerId, personId) {
+  const person = getUser(personId);
+  if (!person || person.owner_id !== ownerId) return { ok: false, error: 'not_yours' };
+
+  const now = Date.now();
+  if (person.whip_cooldown_until && now < person.whip_cooldown_until) {
+    return { ok: false, error: 'cooldown', unlock_at: person.whip_cooldown_until };
+  }
+
+  const unlockAt = now + WHIP_COOLDOWN_MS;
+  updateUser(personId, { whip_cooldown_until: unlockAt });
+  return { ok: true, unlock_at: unlockAt };
+}
+
+// ---- background tick: notify players whose farm cooldown just expired ----
+function runFarmCooldownTick(notifyFn) {
+  const now = Date.now();
+  for (const u of allUsers()) {
+    if (u.farm_cooldown_until && now >= u.farm_cooldown_until) {
+      updateUser(u.id, { farm_taps: 0, farm_cooldown_until: 0 });
+      if (notifyFn) notifyFn(u.id);
+    }
+  }
+}
+// REMOVED: passive random rebellion (owned people escaping on their own,
+// with no action from anyone) used to run here every 10 minutes. Per
+// product decision, the only ways ownership should ever end now are
+// explicit: the owner freeing someone (/api/free), the person paying
+// ransom (/api/ransom), someone stealing them (/api/steal), or buying the
+// Stars "freedom" item. No more free, unexplained escapes.
+
+module.exports = {
+  RANKS,
+  JOBS,
+  randomJob,
+  jobByKey,
+  rankFor,
+  nextRankInfo,
+  ownedCount,
+  accrue,
+  personPendingIncome,
+  collectFromPerson,
+  effectiveIncome,
+  acquisitionCost,
+  ransomCost,
+  stealCost,
+  logEvent,
+  refreshRank,
+  FARM_REWARD,
+  FARM_TAP_LIMIT,
+  farmStatus,
+  tryFarmTap,
+  runFarmCooldownTick,
+  tapUpgradeCost,
+  baseTapValue,
+  tryBuyTapUpgrade,
+  COIN_SHIELD_COST,
+  COIN_SHIELD_DURATION_MS,
+  coinShieldStatus,
+  tryBuyCoinShield,
+  WHIP_COOLDOWN_MS,
+  tryWhip,
+};

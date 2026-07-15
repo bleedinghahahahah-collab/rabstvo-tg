@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Подполье</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="splash">
+  <div class="splash-particles" id="splash-particles"></div>
+  <div class="splash-inner">
+    <svg class="splash-chain" viewBox="0 0 220 90" xmlns="http://www.w3.org/2000/svg">
+      <g class="splash-link splash-link-1">
+        <rect x="4" y="25" width="46" height="34" rx="17" fill="none" stroke="#c9c9c9" stroke-width="8"/>
+      </g>
+      <g class="splash-link splash-link-2">
+        <rect x="42" y="8" width="34" height="70" rx="17" fill="none" stroke="#e4e4e4" stroke-width="8" transform="rotate(90 59 43)"/>
+      </g>
+      <g class="splash-link splash-link-3">
+        <rect x="90" y="25" width="46" height="34" rx="17" fill="none" stroke="#c9c9c9" stroke-width="8"/>
+      </g>
+      <g class="splash-link splash-link-4">
+        <rect x="128" y="8" width="34" height="70" rx="17" fill="none" stroke="#e4e4e4" stroke-width="8" transform="rotate(90 145 43)"/>
+      </g>
+      <g class="splash-link splash-link-5">
+        <rect x="168" y="25" width="46" height="34" rx="17" fill="none" stroke="#c9c9c9" stroke-width="8"/>
+      </g>
+    </svg>
+    <div class="splash-title">ПОДПОЛЬЕ</div>
+  </div>
+</div>
+
+<div class="chain-backdrop">
+  <div class="chain-layer"></div>
+</div>
+
+<div id="app">
+
+  <div class="online-bar">
+    <span class="online-dot"></span>
+    <span id="online-count">—</span> <span class="online-label">играют сейчас</span>
+  </div>
+
+  <!-- ===== Giveaway banner: tap → jumps to «Позвать». Two stacked slides
+       crossfade every 5s (see updateGiveawayCarousel in app.js). ===== -->
+  <button class="giveaway-banner" data-giveaway-banner aria-label="Розыгрыш 1000 звёзд — узнать подробности">
+    <img class="giveaway-banner-slide is-active" data-giveaway-slide src="assets/giveaway-banner.png" alt="Розыгрыш 1000 звёзд" loading="lazy" />
+    <img class="giveaway-banner-slide" data-giveaway-slide src="assets/giveaway-banner.png" alt="" aria-hidden="true" />
+    <span class="giveaway-banner-badge" data-giveaway-badge>0/3</span>
+  </button>
+
+  <!-- ===== Ledger header: always visible, shows the player's own standing ===== -->
+  <header class="ledger-card">
+    <div class="seal" id="seal-wrap"><span id="seal-initials">?</span><img id="seal-avatar" alt="" /></div>
+    <div class="ledger-main">
+      <div class="ledger-name" id="hdr-name">—</div>
+      <div class="ledger-title" id="hdr-rank">Прохожий</div>
+    </div>
+    <div class="ledger-balance">
+      <span class="balance-figure" id="hdr-balance">0</span>
+      <span class="balance-unit">монет</span>
+    </div>
+  </header>
+
+  <div class="ledger-substats">
+    <div class="substat">
+      <span class="substat-label">Доход</span>
+      <span class="substat-value" id="hdr-income">0/ч</span>
+    </div>
+    <div class="substat">
+      <span class="substat-label">Рабов</span>
+      <span class="substat-value" id="hdr-owned">0</span>
+    </div>
+  </div>
+
+  <!-- ===== Tab panels ===== -->
+  <main id="panels">
+
+    <section class="panel" data-panel="profile">
+      <div class="section-title">
+        <span class="eyebrow">Твоё дело</span>
+        <h2>Профиль</h2>
+      </div>
+
+      <div class="profile-status-box" id="profile-status">
+        <span class="profile-status-dot"></span>
+        <span id="profile-status-text">Свободен</span>
+      </div>
+
+      <div id="ransom-section" style="display:none">
+        <button class="action-btn glow-btn red" id="btn-ransom">
+          <span>Выкупить свою свободу</span>
+          <span class="btn-sub" id="ransom-cost">—</span>
+        </button>
+      </div>
+
+      <div class="rank-progress-card">
+        <div class="rank-progress-top">
+          <span class="rank-progress-current" id="rank-progress-current">Прохожий</span>
+          <span class="rank-progress-next" id="rank-progress-next"></span>
+        </div>
+        <div class="rank-progress-bar"><div class="rank-progress-fill" id="rank-progress-fill"></div></div>
+      </div>
+
+      <div class="streak-card">
+        <div class="streak-label">Серия дней подряд</div>
+        <div class="streak-dots" id="streak-dots"></div>
+      </div>
+
+      <div id="status-badges"></div>
+
+      <button class="action-btn glow-btn" id="btn-daily">
+        <span>Забрать дневной взнос</span>
+        <span class="btn-sub" id="daily-sub">доступно</span>
+      </button>
+      <div class="hint-box" id="daily-timer-hint" style="display:none"></div>
+
+      <div class="invite-rewards" style="margin-top:14px;">
+        <div class="invite-reward-card">
+          <span class="invite-reward-figure" id="my-rank-balance">—</span>
+          <span class="invite-reward-label">место по монетам</span>
+        </div>
+        <div class="invite-reward-card">
+          <span class="invite-reward-figure" id="my-rank-owned">—</span>
+          <span class="invite-reward-label">место по рабам</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="market">
+      <div class="section-title">
+        <span class="eyebrow" id="market-eyebrow">Свободные люди</span>
+        <h2>Рынок</h2>
+      </div>
+      <div class="segmented" id="market-segmented">
+        <button class="segmented-btn active" data-mode="free">Свободные</button>
+        <button class="segmented-btn" data-mode="steal">Украсть</button>
+      </div>
+      <input type="text" id="market-search" class="market-search-input" placeholder="Поиск по имени или @username" autocomplete="off" />
+      <div class="segmented" id="market-sort-segmented">
+        <button class="segmented-btn active" data-sort="asc">Дешевле</button>
+        <button class="segmented-btn" data-sort="desc">Дороже</button>
+      </div>
+      <div class="market-count" id="market-count"></div>
+      <div class="list" id="market-list"><div class="empty-state">Ищем кандидатов…</div></div>
+      <button class="action-btn" id="market-load-more" style="display:none;">
+        <span>Показать ещё</span>
+        <span class="btn-sub" id="market-load-more-sub"></span>
+      </button>
+    </section>
+
+    <section class="panel" data-panel="people">
+      <div class="section-title">
+        <span class="eyebrow">Твои активы</span>
+        <h2>Мои люди</h2>
+      </div>
+      <button class="action-btn glow-btn green" id="btn-collect-all">
+        <span>Собрать весь доход</span>
+        <span class="btn-sub" id="collect-all-sub"></span>
+      </button>
+      <div class="list" id="people-list"><div class="empty-state">Пока никого нет.</div></div>
+    </section>
+
+    <section class="panel active" data-panel="farm">
+      <div class="section-title">
+        <span class="eyebrow">Тяжкий, но честный труд</span>
+        <h2>Фарм</h2>
+      </div>
+
+      <div id="farm-view">
+        <div class="farm-counter-wrap">
+          <div class="farm-counter" id="farm-counter">0 / 5000</div>
+          <div class="farm-counter-label">тапов до перерыва</div>
+        </div>
+
+        <div class="farm-btn-wrap">
+          <button class="farm-btn" id="farm-btn">
+            <span id="farm-btn-label">Тапни</span>
+          </button>
+        </div>
+
+        <div class="hint-box" id="farm-lock-hint" style="display:none"></div>
+        <p class="invite-copy" style="text-align:center;margin-top:14px;" id="farm-description">
+          Каждый тап — 1 монета. После 5000 тапов — перерыв на 3 часа.
+        </p>
+
+        <button class="casino-launch-btn" id="btn-open-casino">
+          <span class="casino-launch-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="9" stroke-dasharray="3.2 3.2"/>
+              <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          <span class="casino-launch-text">
+            <span class="casino-launch-title">Казино</span>
+            <span class="casino-launch-sub">краш · рулетка</span>
+          </span>
+          <span class="casino-launch-arrow">→</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="shop">
+      <div class="section-title">
+        <span class="eyebrow">За звёзды и монеты</span>
+        <h2>Магазин</h2>
+      </div>
+
+      <div id="shop-menu">
+        <button class="shop-menu-btn" data-cat="coins">
+          <span class="shop-menu-title">Монеты</span>
+          <span class="shop-menu-sub">за звёзды</span>
+        </button>
+        <button class="shop-menu-btn" data-cat="services">
+          <span class="shop-menu-title">Услуги</span>
+          <span class="shop-menu-sub">за звёзды</span>
+        </button>
+        <button class="shop-menu-btn" data-cat="farm">
+          <span class="shop-menu-title">Фарм</span>
+          <span class="shop-menu-sub">бесплатно · за монеты</span>
+        </button>
+        <button class="shop-menu-btn" data-cat="protect">
+          <span class="shop-menu-title">Защита</span>
+          <span class="shop-menu-sub">бесплатно · за монеты</span>
+        </button>
+      </div>
+
+      <div id="shop-detail" style="display:none;">
+        <button class="action-btn" id="btn-shop-back">← Назад</button>
+
+        <div class="shop-bar" id="shop-bar-coins" style="display:none;">
+          <div class="list" id="shop-list-coins"><div class="empty-state">Загрузка…</div></div>
+        </div>
+
+        <div class="shop-bar" id="shop-bar-services" style="display:none;">
+          <div class="list" id="shop-list-services"><div class="empty-state">Загрузка…</div></div>
+        </div>
+
+        <div class="shop-bar" id="shop-bar-farm" style="display:none;">
+          <div class="list" id="shop-list-farm">
+            <div class="ledger-row" style="flex-wrap:wrap;">
+              <div style="min-width:0;flex:1;">
+                <div class="row-name">Улучшение тапа</div>
+                <div class="row-meta" id="tap-upgrade-meta">Уровень 0 · +0.0 к тапу</div>
+              </div>
+              <div class="row-value" id="tap-upgrade-cost">—</div>
+              <div class="row-actions">
+                <button class="mini-btn buy" id="btn-upgrade-tap">Улучшить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="shop-bar" id="shop-bar-protect" style="display:none;">
+          <div class="list" id="shop-list-protect">
+            <div class="ledger-row" style="flex-wrap:wrap;">
+              <div style="min-width:0;flex:1;">
+                <div class="row-name">Защита от рабства (1 час)</div>
+                <div class="row-meta" id="coin-shield-meta">Тебя нельзя захватить или украсть в течение часа</div>
+              </div>
+              <div class="row-value">5000</div>
+              <div class="row-actions">
+                <button class="mini-btn buy" id="btn-buy-coin-shield">Купить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="top">
+      <div class="section-title">
+        <span class="eyebrow">Иерархия подполья</span>
+        <h2>Топ игроков</h2>
+      </div>
+      <div class="segmented" id="top-segmented">
+        <button class="segmented-btn active" data-mode="balance">По монетам</button>
+        <button class="segmented-btn" data-mode="owned">По рабам</button>
+      </div>
+      <div class="list" id="top-list"><div class="empty-state">Считаем состояния…</div></div>
+    </section>
+
+    <section class="panel" data-panel="invite">
+      <div class="section-title">
+        <span class="eyebrow">Расширяй сеть</span>
+        <h2>Пригласить</h2>
+      </div>
+
+      <div class="giveaway-status-card" id="giveaway-status-card">
+        <div class="giveaway-status-top">
+          <span class="giveaway-status-title">Розыгрыш 1000 звёзд</span>
+          <span class="giveaway-status-pill" id="giveaway-status-pill">ВЫ НЕ УЧАСТВУЕТЕ</span>
+        </div>
+        <div class="giveaway-status-progress">
+          <div class="giveaway-status-bar"><div class="giveaway-status-fill" id="giveaway-status-fill"></div></div>
+          <span class="giveaway-status-count" id="giveaway-status-count">0 / 3 приглашено</span>
+        </div>
+        <div class="giveaway-status-hint" id="giveaway-status-hint">Пригласи ещё 3 человека, чтобы участвовать.</div>
+        <div class="giveaway-serials" id="giveaway-serials" style="display:none"></div>
+      </div>
+
+      <div class="invite-hero">
+        <div class="invite-hero-icon">+</div>
+        <div>
+          <div class="invite-hero-title">Приведи друга — получи актив</div>
+          <div class="invite-hero-sub">Он сразу поступает к тебе в услужение</div>
+        </div>
+      </div>
+
+      <div class="invite-rewards">
+        <div class="invite-reward-card">
+          <span class="invite-reward-figure">+1250</span>
+          <span class="invite-reward-label">тебе за приглашение</span>
+        </div>
+        <div class="invite-reward-card">
+          <span class="invite-reward-figure">900</span>
+          <span class="invite-reward-label">у друга на старте</span>
+        </div>
+      </div>
+
+      <button class="action-btn glow-btn green" id="btn-copy-link">
+        <span>Скопировать ссылку-приглашение</span>
+        <span class="btn-sub">поделиться</span>
+      </button>
+      <div class="hint-box" id="invite-link-box" style="display:none"></div>
+    </section>
+
+  </main>
+
+  <!-- ===== Bottom tab bar ===== -->
+  <nav class="tabbar">
+    <button class="tab-btn" data-tab="profile">Профиль</button>
+    <button class="tab-btn" data-tab="market">Рынок</button>
+    <button class="tab-btn" data-tab="people">Люди</button>
+    <button class="tab-btn active" data-tab="farm">Фарм</button>
+    <button class="tab-btn" data-tab="shop">Магазин</button>
+    <button class="tab-btn" data-tab="top">Топ</button>
+    <button class="tab-btn" data-tab="invite">Позвать</button>
+  </nav>
+
+  <!-- ===== Casino hub: choose Краш or Рулетка ===== -->
+  <div id="casino-menu-view">
+    <div class="casino-chips-bg" id="casino-menu-chips-bg"></div>
+    <div class="casino-sparkles" id="casino-menu-sparkles"></div>
+    <div class="casino-content">
+      <div class="casino-topbar">
+        <button class="casino-back-btn" id="btn-casino-menu-back">
+          <span class="casino-back-arrow">←</span>
+          <span class="casino-back-label">Назад</span>
+        </button>
+      </div>
+      <div class="casino-marquee" aria-hidden="true"></div>
+
+      <div class="casino-menu-title">Выбери игру</div>
+      <div class="casino-menu-grid">
+        <button class="casino-menu-card" id="casino-menu-open-crash">
+          <span class="casino-menu-card-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="9" stroke-dasharray="3.2 3.2"/>
+              <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          <span class="casino-menu-card-text">
+            <span class="casino-menu-card-title">Краш</span>
+            <span class="casino-menu-card-sub">общий раунд · растущий множитель</span>
+          </span>
+          <span class="casino-menu-card-arrow">→</span>
+        </button>
+
+        <button class="casino-menu-card" id="casino-menu-open-roulette">
+          <span class="casino-menu-card-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="7" r="2" fill="#E5484D" stroke="none"/>
+              <circle cx="16.5" cy="14.5" r="2" fill="#141414" stroke="currentColor" stroke-width="0.8"/>
+              <circle cx="7.5" cy="14.5" r="2" fill="#3ECF8E" stroke="none"/>
+            </svg>
+          </span>
+          <span class="casino-menu-card-text">
+            <span class="casino-menu-card-title">Рулетка</span>
+            <span class="casino-menu-card-sub">красное · чёрное · зелёное</span>
+          </span>
+          <span class="casino-menu-card-arrow">→</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Casino: standalone full-screen crash game, no header/tabbar ===== -->
+  <div id="casino-view">
+    <div class="casino-chips-bg" id="casino-chips-bg"></div>
+    <div class="casino-sparkles" id="casino-crash-sparkles"></div>
+
+    <div class="casino-content">
+      <div class="casino-topbar">
+        <button class="casino-back-btn" id="btn-casino-back">
+          <span class="casino-back-arrow">←</span>
+          <span class="casino-back-label">Назад</span>
+        </button>
+        <span class="casino-topbar-balance"><span id="casino-balance">0</span> монет</span>
+      </div>
+      <div class="casino-marquee" aria-hidden="true"></div>
+
+      <div class="crash-history" id="crash-history"></div>
+
+      <div class="crash-stage" id="crash-stage">
+        <svg class="crash-chain-svg" id="crash-chain-svg" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+          <g id="crash-chain-left"></g>
+          <g id="crash-chain-right"></g>
+        </svg>
+        <div class="crash-readout">
+          <div class="crash-multiplier" id="crash-multiplier">1.00x</div>
+          <div class="crash-phase-label" id="crash-phase-label">Приём ставок…</div>
+        </div>
+      </div>
+
+      <div class="crash-bet-box">
+        <div class="crash-bet-row">
+          <input type="number" id="crash-bet-amount" class="crash-bet-input" min="5" step="5" value="50" inputmode="numeric" />
+          <div class="crash-bet-quick">
+            <button type="button" data-add="50">+50</button>
+            <button type="button" data-add="200">+200</button>
+            <button type="button" data-mult="0.5">1/2</button>
+            <button type="button" data-mult="2">x2</button>
+            <button type="button" id="crash-bet-allin">Ва-банк</button>
+          </div>
+        </div>
+        <div class="crash-auto-row">
+          <span class="crash-auto-label">Авто-вывод на</span>
+          <input type="number" id="crash-auto-cashout" class="crash-bet-input crash-auto-input" min="1.01" step="0.1" placeholder="напр. 2.5" inputmode="decimal" />
+          <span class="crash-auto-suffix">x</span>
+        </div>
+        <button class="action-btn glow-btn green" id="crash-action-btn">
+          <span id="crash-action-label">Поставить</span>
+          <span class="btn-sub" id="crash-action-sub"></span>
+        </button>
+      </div>
+
+      <div class="crash-bets-label">Ставки игроков</div>
+      <div class="list" id="crash-bets-list"><div class="empty-state">Пока никто не поставил.</div></div>
+    </div>
+  </div>
+
+  <!-- ===== Roulette: standalone full-screen game, same pattern as Краш ===== -->
+  <div id="roulette-view">
+    <div class="casino-chips-bg" id="roulette-chips-bg"></div>
+    <div class="casino-sparkles" id="roulette-sparkles"></div>
+
+    <div class="casino-content">
+      <div class="casino-topbar">
+        <button class="casino-back-btn" id="btn-roulette-back">
+          <span class="casino-back-arrow">←</span>
+          <span class="casino-back-label">Назад</span>
+        </button>
+        <span class="casino-topbar-balance"><span id="roulette-balance">0</span> монет</span>
+      </div>
+      <div class="casino-marquee" aria-hidden="true"></div>
+
+      <div class="crash-history" id="roulette-history"></div>
+
+      <div class="roulette-stage" id="roulette-stage">
+        <svg class="roulette-wheel-svg" id="roulette-wheel-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <g id="roulette-wheel-group"></g>
+        </svg>
+        <div class="roulette-readout">
+          <div class="roulette-result-badge" id="roulette-result-badge">?</div>
+          <div class="roulette-phase-label" id="roulette-phase-label">Приём ставок…</div>
+        </div>
+      </div>
+
+      <div class="crash-bet-box">
+        <div class="crash-bet-row">
+          <input type="number" id="roulette-bet-amount" class="crash-bet-input" min="5" step="5" value="50" inputmode="numeric" />
+          <div class="crash-bet-quick">
+            <button type="button" data-add="50">+50</button>
+            <button type="button" data-add="200">+200</button>
+            <button type="button" data-mult="0.5">1/2</button>
+            <button type="button" data-mult="2">x2</button>
+            <button type="button" id="roulette-bet-allin">Ва-банк</button>
+          </div>
+        </div>
+
+        <div class="roulette-color-row">
+          <button class="roulette-color-btn red" data-color="red">
+            <span class="roulette-color-name">Красное</span>
+            <span class="roulette-color-mult">×2</span>
+          </button>
+          <button class="roulette-color-btn black" data-color="black">
+            <span class="roulette-color-name">Чёрное</span>
+            <span class="roulette-color-mult">×2</span>
+          </button>
+          <button class="roulette-color-btn green" data-color="green">
+            <span class="roulette-color-name">Зелёное</span>
+            <span class="roulette-color-mult">×20</span>
+          </button>
+        </div>
+        <div class="roulette-my-bet" id="roulette-my-bet-status" style="display:none;"></div>
+      </div>
+
+      <div class="crash-bets-label">Ставки игроков</div>
+      <div class="list" id="roulette-bets-list"><div class="empty-state">Пока никто не поставил.</div></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="big-alert">
+    <div id="big-alert-card">
+      <div id="big-alert-title">ВАС ВЗЯЛИ В РАБСТВО!!!</div>
+      <div id="big-alert-body">Теперь часть твоего дохода уходит новому владельцу. Хочешь выбраться — загляни в «Профиль» и выкупи свободу.</div>
+      <button id="big-alert-close">Понятно</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
